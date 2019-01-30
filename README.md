@@ -21,6 +21,14 @@ subject to the transition matrix `T`
 
 `H` is the feature basis, which is consistent over the entire sequence, and `W_i` is the condensed representation of `X_i` on the feature basis spanned by `H`
 
+_Loss_
+
+The loss function for optimization is the frobenius norm of the predicted values of `X_i` with their true values
+
+`L = \sum_i^N distance( X_i, T^(i-1) * W_0 * H )`
+
+The trainable variables are `T, W_0, and H`, which we also l2-regularize to improve generalization.
+
 ## Usage
 
 ### Requirements
