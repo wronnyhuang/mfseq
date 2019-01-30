@@ -23,7 +23,7 @@ subject to the transition matrix `T`
 
 _Loss_
 
-The loss function for optimization is the frobenius norm of the predicted values of `X_i` with their true values
+The loss function for optimization is the distance (e.g., frobenius norm) of the predicted values of `X_i` from their true values
 
 `L = \sum_i^N distance( X_i, T^(i-1) * W_0 * H )`
 
