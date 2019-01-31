@@ -19,11 +19,11 @@ subject to the transition matrix `T`
 
 `W_{i+1} = W_i * T`
 
+`H` is the feature basis, which is consistent over the entire sequence, and `W_i` is the condensed representation of `X_i` on the feature basis spanned by `H`
+
 We make the optimization easier by calculating only the residual of each transition
 
 `W_{i+1} = W_i + W_i * T_res`
-
-`H` is the feature basis, which is consistent over the entire sequence, and `W_i` is the condensed representation of `X_i` on the feature basis spanned by `H`
 
 _Loss_
 
