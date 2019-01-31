@@ -16,14 +16,15 @@ class Model():
 
   def build_graph(self):
 
+    with tf.name_scope('hyperparams'):
+      self.lr = tf.placeholder(tf.float32, [], name='lr')
+      self.wdeccoef = tf.placeholder(tf.float32, [], name='wdeccoef')
+
     with tf.name_scope('inputs'):
       self.timeidx = tf.placeholder(tf.int32, [None], name='timeidx')
       self.nodeidx = tf.placeholder(tf.int32, [None], name='nodeidx')
       self.featidx = tf.placeholder(tf.int32, [None], name='featidx')
       self.labels = tf.placeholder(tf.float32, [None], name='labels')
-    with tf.name_scope('hyperparams'):
-      self.lr = tf.placeholder(tf.float32, [], name='lr')
-      self.wdeccoef = tf.placeholder(tf.float32, [], name='wdeccoef')
 
     with tf.name_scope('forward'):
 
