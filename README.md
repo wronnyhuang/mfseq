@@ -44,7 +44,7 @@ The trainable variables are `T, W_0, and H`, which we also l2-regularize to impr
 The code is self contained within the `main.py` file. Toy data is included in the `Model.fit` function. Change this to integrate your data.
 
 ### Computation graph visualization
-An interactive tensorboard of the constructed computation graph is shown here
+An interactive tensorboard of the constructed computation graph is in the following link
 https://boards.aughie.org/board/IQg3vzIEAcHviNIniDicLLQ-U_E/
 
 Screenshot of high level graph
