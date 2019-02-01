@@ -28,9 +28,9 @@ class Model():
 
     with tf.name_scope('forward'):
 
-      W = tf.Variable(tf.truncated_normal([nnode, rank], stddev=0.2, mean=0), name='W_0')
-      H = tf.Variable(tf.truncated_normal([rank, nfeat], stddev=0.2, mean=0), name='H')
-      Tres = tf.Variable(tf.truncated_normal([rank, rank], stddev=0.2, mean=0), name='Tres')
+      W = tf.Variable(tf.truncated_normal([nnode, args.rank], stddev=0.2, mean=0), name='W_0')
+      H = tf.Variable(tf.truncated_normal([args.rank, nfeat], stddev=0.2, mean=0), name='H')
+      Tres = tf.Variable(tf.truncated_normal([args.rank, args.rank], stddev=0.2, mean=0), name='Tres')
 
       X = []
       for t in range(ntime):
@@ -93,6 +93,7 @@ if __name__=='__main__':
 
   parser = argparse.ArgumentParser()
   parser.add_argument('-name', default='debug', type=str)
+  parser.add_argument('-rank', default=3, type=int)
   args = parser.parse_args()
 
   home = os.environ['HOME']
@@ -102,7 +103,6 @@ if __name__=='__main__':
   ntime = 4
   nnode = 10
   nfeat = 5
-  rank = 3
 
   model = Model(args)
 
