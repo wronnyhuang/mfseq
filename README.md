@@ -21,6 +21,10 @@ subject to the transition matrix `T`
 
 `H` is the feature basis, which is consistent over the entire sequence, and `W_i` is the condensed representation of `X_i` on the feature basis spanned by `H`
 
+We make the optimization easier by calculating only the residual of each transition
+
+`W_{i+1} = W_i + W_i * T_res`
+
 _Loss_
 
 The loss function for optimization is the distance (e.g., frobenius norm) of the predicted values of `X_i` from their true values
@@ -39,9 +43,15 @@ The trainable variables are `T, W_0, and H`, which we also l2-regularize to impr
 
 The code is self contained within the `main.py` file. Toy data is included in the `Model.fit` function. Change this to integrate your data.
 
-A tensorboard of the constructed computation graph is shown here
+### Computation graph visualization
+An interactive tensorboard of the constructed computation graph is in the following link
+https://boards.aughie.org/board/IQg3vzIEAcHviNIniDicLLQ-U_E/
+
+Screenshot of high level graph
+
 ![tensorboard high level](doc/tensorboard.png)
 
 The main feed-forward computations are enclosed within the `forward` block.
+
 ![tensorboard zoom in](doc/tensorboardzoom.png)
 
