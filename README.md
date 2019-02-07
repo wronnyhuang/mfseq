@@ -60,4 +60,4 @@ The main feed-forward computations are enclosed within the `forward` block.
 Typically graph features (such as those extracted by ReFeX) can contain large variations in the values. To make the optimization work, we must first normalize the graph features values. To do this, we mean-standardize each feature's marginal distribution. We show the data exploration and normalization process in this notebook https://colab.research.google.com/drive/13Gj8qYA2Nl8jucQbWaYeuclmaStkwODL
 
 A gif of all the nonzero feature marginal distributions is shown here
-![histograms](https://media.giphy.com/media/FsW0PBPW3UJR03oy9P/giphy.gif)
+![histograms](doc/histograms.gif)
