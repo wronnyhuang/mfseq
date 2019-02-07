@@ -55,3 +55,7 @@ The main feed-forward computations are enclosed within the `forward` block.
 
 ![tensorboard zoom in](doc/tensorboardzoom.png)
 
+## Data exploration and normalization
+
+Typically graph features (such as those extracted by ReFeX) can contain large variations in the values. To make the optimization work, we must first normalize the graph features values. To do this, we mean-standardize each feature's marginal distribution. We show the data exploration and normalization process in this notebook https://colab.research.google.com/drive/13Gj8qYA2Nl8jucQbWaYeuclmaStkwODL
+
