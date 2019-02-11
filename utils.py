@@ -1,4 +1,5 @@
 import os
+from datetime import datetime
 
 def maybe_download(source_url, filename, target_directory, filetype='folder', force=False):
   """Download the data from some website, unless it's already here."""
@@ -20,3 +21,6 @@ def maybe_download(source_url, filename, target_directory, filetype='folder', fo
       os.system('rm '+filepath+'.tar')
     elif filetype=='file':
       os.system('curl -L -o '+filepath+' '+source_url)
+
+def timenow():
+  return datetime.now().strftime('%m-%d_%H:%M:%S_%f')

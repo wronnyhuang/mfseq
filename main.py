@@ -1,5 +1,4 @@
-# from comet_ml import Experiment
-# experiment = Experiment(api_key="vPCPPZrcrUBitgoQkvzxdsh9k", parse_args=False, project_name='nmf')
+from comet_ml import Experiment
 import tensorflow as tf
 import numpy as np
 import argparse
@@ -9,7 +8,7 @@ import pickle
 import gzip
 import torch.utils.data
 from time import time
-from utils import maybe_download
+from utils import maybe_download, timenow
 
 class Model():
 
@@ -25,6 +24,7 @@ class Model():
 
     with tf.name_scope('hyperparams'):
       self.lr = tf.placeholder(tf.float32, [], name='lr')
+      self.trancoef = tf.placeholder(tf.float32, [], name='trancoef')
       self.wdeccoef = tf.placeholder(tf.float32, [], name='wdeccoef')
 
     with tf.name_scope('inputs'):
@@ -35,17 +35,19 @@ class Model():
 
     with tf.name_scope('forward'):
 
-      # W = tf.Variable(tf.truncated_normal([nnode, args.rank], stddev=0.2, mean=0), name='W_0')
       H = tf.Variable(tf.truncated_normal([args.rank, nfeat], stddev=0.2, mean=0), name='H')
-      Tres = tf.Variable(tf.truncated_normal([args.rank, args.rank], stddev=0.2, mean=0), name='Tres')
+      T = tf.Variable(tf.truncated_normal([args.rank, args.rank], stddev=0.2, mean=0), name='Tres')
 
       X = []
-      W = []
+      self.W = []
+      self.W_tran = []
       for t in range(ntime):
         w = tf.Variable(tf.truncated_normal([nnode, args.rank], stddev=0.2, mean=0), name='W_'+str(t))
         X.append(tf.matmul(w, H, name='X_'+str(t)))
-        W.append(w)
-        # W = tf.add(W, tf.matmul(W, Tres, name='Wres_'+str(t+1)), name='W_'+str(t+1))
+        self.W.append(w)
+        if t > 0: # add transition regularizer
+          w_tran = tf.matmul(self.W[-2], T, name='W_tran_'+str(t))
+          self.W_tran.append(w_tran)
 
     with tf.name_scope('predictions'):
       X = tf.stack(X, axis=0, name='X')
@@ -54,18 +56,21 @@ class Model():
         indices = self.timeidx*nnode*nfeat + self.nodeidx*nfeat + self.featidx
       self.preds = tf.gather(Xflat, indices, name='Xgather')
 
-    with tf.name_scope('weight_decay'):
-      self.wdec = self.wdeccoef * tf.global_norm(tf.trainable_variables())
 
     with tf.name_scope('loss'):
-
+      criterion = tf.losses.mean_squared_error
       with tf.name_scope('criterion'):
-        criterion = lambda preds, labels: tf.reduce_mean( ( preds - labels )**2 )
         self.crit = criterion(self.preds, self.labels)
+      with tf.name_scope('transition'):
+        self.tran = tf.add_n([criterion(w_tran, w) for w_tran, w in zip(self.W_tran, self.W[1:])]) / len(self.W_tran)
+      with tf.name_scope('weight_decay'):
+        self.wdec = tf.global_norm(tf.trainable_variables())
 
-      self.loss = tf.add(self.crit, self.wdec, name='loss')
+
+      self.loss = tf.add_n([self.crit, self.trancoef * self.tran, self.wdeccoef * self.wdec], name='loss')
       self.step = tf.train.get_or_create_global_step()
-      self.trainop = tf.train.AdamOptimizer(self.lr).minimize(self.loss, name='trainop', global_step=self.step)
+      self.trainop = tf.train.AdamOptimizer(self.lr).minimize(
+        self.loss, name='trainop', global_step=self.step)
 
 
     tf.summary.scalar('train/crit', self.crit)
@@ -83,28 +88,9 @@ class Model():
   def fit(self, trainloader, testloader):
     '''fit the model to the data presented in the input dataloader'''
 
-    for epoch in range(10):
-
-      # train for an epoch
-      elapsed = 0
-      for i, batch in enumerate(trainloader):
-
-        start = time()
-        timeidx, nodeidx, featidx, labels = batch.numpy().transpose()
-        _, merged, loss, crit, step = self.sess.run([self.trainop, self.merged, self.loss, self.crit, self.step],
-                           {self.timeidx: timeidx,
-                            self.nodeidx: nodeidx,
-                            self.featidx: featidx,
-                            self.labels: labels,
-                            self.lr: args.lr,
-                            self.wdeccoef: args.wdeccoef,
-                            })
-        elapsed += time()-start
-        logperiod = 1
-        if np.mod(step, logperiod) == 0:
-          self.writer.add_summary(merged, step)
-          print('TRAIN: epoch', epoch, '\tstep', step, '\tcrit', crit, '\tloss', loss, '\telapsed', elapsed/logperiod)
-          elapsed = 0
+    step = 0
+    self.metrics = dict(loss=self.loss, crit=self.crit, tran=self.tran, wdec=self.wdec)
+    for epoch in range(args.nepoch):
 
       # test over all test data
       running_crit = 0
@@ -118,17 +104,29 @@ class Model():
                                })
         running_crit += crit * len(batch)
       avg_crit = running_crit / len(testloader.dataset)
-      self.log_avgs_hack(avg_crit)
-      print('TEST: epoch', epoch, '\tstep', step, '\tcrit', crit)
+      experiment.log_metric('test/crit', avg_crit, epoch)
+      print('TEST:\tepoch', epoch, '\tstep', step, '\tcrit', avg_crit)
 
-  def log_avgs_hack(self, avg_crit):
+      # train for an epoch
+      for i, batch in enumerate(trainloader):
 
-    if self.merged_test not in locals():
-      self.testcrit = tf.get_variable(name='testcrit')
-      summary_crit = tf.summary.scalar('test/crit', testcrit, step)
-      self.merged_test = tf.summary.merge(summary_crit)
-    merged = self.sess.run([self.merged_test], {self.testcrit: avg_crit})
-    self.writer.add_summary(merged, step)
+        timeidx, nodeidx, featidx, labels = batch.numpy().transpose()
+        _, metrics, step = self.sess.run([self.trainop, self.metrics, self.step],
+                           {self.timeidx: timeidx,
+                            self.nodeidx: nodeidx,
+                            self.featidx: featidx,
+                            self.labels: labels,
+                            self.lr: args.lrnrate,
+                            self.trancoef: args.trancoef,
+                            self.wdeccoef: args.wdeccoef,
+                            })
+        if i==0:
+          running_metrics = {k:v*len(batch) for (k,v) in metrics.items()}
+        else:
+          running_metrics = {k:rv+v*len(batch) for (k,v),(rk,rv) in zip(metrics.items(), running_metrics.items())}
+      metrics = {k:v/len(trainloader.dataset) for (k,v) in running_metrics.items()}
+      experiment.log_metrics(metrics, step=epoch)
+      print('TRAIN:\tepoch', epoch, '\tstep', step, '\tcrit', metrics['crit'], '\tloss', metrics['loss'])
 
 
 class GraphDataset(torch.utils.data.Dataset):
@@ -153,20 +151,31 @@ if __name__=='__main__':
   parser = argparse.ArgumentParser()
   parser.add_argument('-name', default='debug', type=str)
   parser.add_argument('-rank', default=3, type=int)
-  parser.add_argument('-batchsize', default=100000, type=int)
-  parser.add_argument('-lr', default=.1, type=float)
+  parser.add_argument('-batchsize', default=200000, type=int)
+  parser.add_argument('-lrnrate', default=.1, type=float)
+  parser.add_argument('-trancoef', default=1, type=float)
   parser.add_argument('-wdeccoef', default=1e-4, type=float)
+  parser.add_argument('-nepoch', default=200, type=int)
+  parser.add_argument('-gpu', default='0', type=str)
+  parser.add_argument('-randname', action='store_true')
   args = parser.parse_args()
+
+  # comet experiement
+  experiment = Experiment(api_key="vPCPPZrcrUBitgoQkvzxdsh9k", parse_args=False, project_name='nmf')
+  experiment.log_parameters(vars(args))
 
   # front matter
   home = os.environ['HOME']
+  autoname = 'rank_%s/lr_%s/wdeccoef_%s' % (args.rank, args.lrnrate, args.wdeccoef)
+  experiment.set_name(autoname)
   args.logdir = join(home, 'ckpt', args.name)
   os.makedirs(args.logdir, exist_ok=True)
+  os.environ['CUDA_VISIBLE_DEVICES'] = args.gpu
 
   # load data from file
   maybe_download('https://www.dropbox.com/s/pc8qggvvm2gfebl/graph_data_table.pkl?dl=0',
-                 'graph_data_table.pkl', os.getcwd(), filetype='file')
-  with gzip.open('graph_data_table.pkl', 'rb') as f:
+                 'graph_data_table.pkl', join(home, 'datasets'), filetype='file')
+  with gzip.open(join(home, 'datasets', 'graph_data_table.pkl'), 'rb') as f:
     (timeidx, nodeidx, featidx), labels, (ntime, nnode, nfeat) = pickle.load(f)
 
   # create dataloader object
