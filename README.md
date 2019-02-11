@@ -68,6 +68,6 @@ A gif of all the nonzero feature marginal distributions is shown here. The data 
 
 ## Results
 
-General (negative values allowed) matrix factorization yields the following training curve. `crit` stands for criterion, which here is the mean-squared-error (MSE) of all the trainable parameters. The training criterion goes way down, indicating that the optimizer is working well. There is a bit of generalization performance, as the test criterion does down about 15%, but better regularizers and more data can make this improve more.
+General (negative values allowed) matrix factorization yields the following training curve. `crit` stands for criterion, which here is the mean-squared-error (MSE) of all the trainable parameters. The training criterion goes way down, indicating that the optimizer is working well. There is a bit of generalization performance, as the test criterion does down about 15%, but better regularizers and more data can make this improve more. The interactive version of these plots are here https://www.comet.ml/wronnyhuang/nmf/e1e9bd13799448f3bf04365e5aec57c4.
 
 ![general matrix factorization training curve](doc/traincurve.png)
