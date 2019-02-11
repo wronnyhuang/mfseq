@@ -1,20 +1,27 @@
-from comet_ml import Experiment
-experiment = Experiment(api_key="vPCPPZrcrUBitgoQkvzxdsh9k", parse_args=False, project_name='nmf')
+# from comet_ml import Experiment
+# experiment = Experiment(api_key="vPCPPZrcrUBitgoQkvzxdsh9k", parse_args=False, project_name='nmf')
 import tensorflow as tf
 import numpy as np
 import argparse
 import os
 from os.path import join, basename, dirname, exists
+import pickle
+import gzip
+import torch.utils.data
+from time import time
+from utils import maybe_download
 
 class Model():
 
   def __init__(self, args):
+    '''constructor of the model. create computation graph and build the session'''
 
     self.args = args
     self.build_graph()
     self.build_sess()
 
   def build_graph(self):
+    '''build computational graph'''
 
     with tf.name_scope('hyperparams'):
       self.lr = tf.placeholder(tf.float32, [], name='lr')
@@ -28,14 +35,17 @@ class Model():
 
     with tf.name_scope('forward'):
 
-      W = tf.Variable(tf.truncated_normal([nnode, args.rank], stddev=0.2, mean=0), name='W_0')
+      # W = tf.Variable(tf.truncated_normal([nnode, args.rank], stddev=0.2, mean=0), name='W_0')
       H = tf.Variable(tf.truncated_normal([args.rank, nfeat], stddev=0.2, mean=0), name='H')
       Tres = tf.Variable(tf.truncated_normal([args.rank, args.rank], stddev=0.2, mean=0), name='Tres')
 
       X = []
+      W = []
       for t in range(ntime):
-        X.append(tf.matmul(W, H, name='X_'+str(t)))
-        W = tf.add(W, tf.matmul(W, Tres, name='Wres_'+str(t+1)), name='W_'+str(t+1))
+        w = tf.Variable(tf.truncated_normal([nnode, args.rank], stddev=0.2, mean=0), name='W_'+str(t))
+        X.append(tf.matmul(w, H, name='X_'+str(t)))
+        W.append(w)
+        # W = tf.add(W, tf.matmul(W, Tres, name='Wres_'+str(t+1)), name='W_'+str(t+1))
 
     with tf.name_scope('predictions'):
       X = tf.stack(X, axis=0, name='X')
@@ -54,56 +64,120 @@ class Model():
         self.crit = criterion(self.preds, self.labels)
 
       self.loss = tf.add(self.crit, self.wdec, name='loss')
-      self.trainop = tf.train.AdamOptimizer(self.lr).minimize(self.loss, name='trainop')
+      self.step = tf.train.get_or_create_global_step()
+      self.trainop = tf.train.AdamOptimizer(self.lr).minimize(self.loss, name='trainop', global_step=self.step)
 
-    self.step = tf.train.get_or_create_global_step()
 
-    tf.summary.scalar('crit', self.crit)
-    tf.summary.scalar('loss', self.loss)
+    tf.summary.scalar('train/crit', self.crit)
+    tf.summary.scalar('train/loss', self.loss)
+    tf.summary.scalar('lr', self.lr)
     self.merged = tf.summary.merge_all()
 
   def build_sess(self):
+    '''start tf session'''
 
     self.sess = tf.Session(config=tf.ConfigProto(allow_soft_placement=True, gpu_options=tf.GPUOptions(allow_growth=True)))
     self.sess.run(tf.global_variables_initializer())
-    writer = tf.summary.FileWriter(self.args.logdir, graph=self.sess.graph)
+    self.writer = tf.summary.FileWriter(self.args.logdir, graph=self.sess.graph)
 
-  def fit(self):
+  def fit(self, trainloader, testloader):
+    '''fit the model to the data presented in the input dataloader'''
 
-    # toy data
-    timeidx = np.array([0,0,1,2])
-    nodeidx = np.array([0,0,1,2])
-    featidx = np.array([0,1,0,1])
-    labels = np.array([1.1, 0.5, 3.3, 0.2])
-    lr = .1
-    wdeccoef = 1e-4
+    for epoch in range(10):
 
-    _, merged, step = self.sess.run([model.trainop, model.merged, model.step],
-                       {model.timeidx: timeidx,
-                        model.nodeidx: nodeidx,
-                        model.featidx: featidx,
-                        model.labels: labels,
-                        model.lr: lr,
-                        model.wdeccoef: wdeccoef,
-                        })
+      # train for an epoch
+      elapsed = 0
+      for i, batch in enumerate(trainloader):
 
-    writer.add_summary(merged, step)
+        start = time()
+        timeidx, nodeidx, featidx, labels = batch.numpy().transpose()
+        _, merged, loss, crit, step = self.sess.run([self.trainop, self.merged, self.loss, self.crit, self.step],
+                           {self.timeidx: timeidx,
+                            self.nodeidx: nodeidx,
+                            self.featidx: featidx,
+                            self.labels: labels,
+                            self.lr: args.lr,
+                            self.wdeccoef: args.wdeccoef,
+                            })
+        elapsed += time()-start
+        logperiod = 1
+        if np.mod(step, logperiod) == 0:
+          self.writer.add_summary(merged, step)
+          print('TRAIN: epoch', epoch, '\tstep', step, '\tcrit', crit, '\tloss', loss, '\telapsed', elapsed/logperiod)
+          elapsed = 0
+
+      # test over all test data
+      running_crit = 0
+      for i, batch in enumerate(testloader):
+        timeidx, nodeidx, featidx, labels = batch.numpy().transpose()
+        crit, = self.sess.run([self.crit],
+                              {self.timeidx: timeidx,
+                               self.nodeidx: nodeidx,
+                               self.featidx: featidx,
+                               self.labels: labels,
+                               })
+        running_crit += crit * len(batch)
+      avg_crit = running_crit / len(testloader.dataset)
+      self.log_avgs_hack(avg_crit)
+      print('TEST: epoch', epoch, '\tstep', step, '\tcrit', crit)
+
+  def log_avgs_hack(self, avg_crit):
+
+    if self.merged_test not in locals():
+      self.testcrit = tf.get_variable(name='testcrit')
+      summary_crit = tf.summary.scalar('test/crit', testcrit, step)
+      self.merged_test = tf.summary.merge(summary_crit)
+    merged = self.sess.run([self.merged_test], {self.testcrit: avg_crit})
+    self.writer.add_summary(merged, step)
+
+
+class GraphDataset(torch.utils.data.Dataset):
+  '''dataset object for the aml graph data with features extracted via refex'''
+
+  def __init__(self, timeidx, nodeidx, featidx, labels, train=True):
+
+    self.data = np.array(list((zip(timeidx, nodeidx, featidx, labels))))
+    condition = timeidx != timeidx.max() if train else timeidx == timeidx.max()
+    self.data = self.data[condition]
+
+  def __len__(self):
+    return len(self.data)
+
+  def __getitem__(self, idx):
+    return self.data[idx]
+
 
 if __name__=='__main__':
 
+  # parse terminal arguments
   parser = argparse.ArgumentParser()
   parser.add_argument('-name', default='debug', type=str)
   parser.add_argument('-rank', default=3, type=int)
+  parser.add_argument('-batchsize', default=100000, type=int)
+  parser.add_argument('-lr', default=.1, type=float)
+  parser.add_argument('-wdeccoef', default=1e-4, type=float)
   args = parser.parse_args()
 
+  # front matter
   home = os.environ['HOME']
   args.logdir = join(home, 'ckpt', args.name)
   os.makedirs(args.logdir, exist_ok=True)
 
-  ntime = 4
-  nnode = 10
-  nfeat = 5
+  # load data from file
+  maybe_download('',
+                 'graph_data_table.pkl', os.getcwd())
+  with gzip.open('datatable.pkl', 'rb') as f:
+    (timeidx, nodeidx, featidx), labels, (ntime, nnode, nfeat) = pickle.load(f)
 
+  # create dataloader object
+  trainloader = torch.utils.data.DataLoader(GraphDataset(timeidx, nodeidx, featidx, labels, True), batch_size=args.batchsize, shuffle=True, num_workers=0)
+  testloader = torch.utils.data.DataLoader(GraphDataset(timeidx, nodeidx, featidx, labels, False), batch_size=args.batchsize, shuffle=False, num_workers=0)
+
+  # build tf graph
   model = Model(args)
+
+  # run optimizer on training data
+  model.fit(trainloader, testloader)
+
 
 
