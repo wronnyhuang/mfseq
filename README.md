@@ -55,9 +55,9 @@ The main feed-forward computations are enclosed within the `forward` block.
 
 ![tensorboard zoom in](doc/tensorboardzoom.png)
 
-# Results on graph data 
+## Results on graph data 
 
-## Data exploration and normalization
+### Data exploration and normalization
 
 Typically graph features (such as those extracted by ReFeX) can contain large variations in the values. To make the optimization work, we must first normalize the graph features values. To do this, we mean-standardize each feature's marginal distribution. We show the data exploration and normalization process in this notebook https://colab.research.google.com/drive/13Gj8qYA2Nl8jucQbWaYeuclmaStkwODL
 
@@ -66,7 +66,7 @@ A gif of all the nonzero feature marginal distributions is shown here. The data 
 ![histograms](doc/histograms.gif)
 
 
-## Results
+### Results
 
 General (negative values allowed) matrix factorization yields the following training curve. `crit` stands for criterion, which here is the mean-squared-error (MSE) of all the trainable parameters. The training criterion goes way down, indicating that the optimizer is working well. There is a bit of generalization performance, as the test criterion does down about 15%, but better regularizers and more data can make this improve more.
 
