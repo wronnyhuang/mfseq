@@ -164,9 +164,9 @@ if __name__=='__main__':
   os.makedirs(args.logdir, exist_ok=True)
 
   # load data from file
-  maybe_download('',
-                 'graph_data_table.pkl', os.getcwd())
-  with gzip.open('datatable.pkl', 'rb') as f:
+  maybe_download('https://www.dropbox.com/s/pc8qggvvm2gfebl/graph_data_table.pkl?dl=0',
+                 'graph_data_table.pkl', os.getcwd(), filetype='file')
+  with gzip.open('graph_data_table.pkl', 'rb') as f:
     (timeidx, nodeidx, featidx), labels, (ntime, nnode, nfeat) = pickle.load(f)
 
   # create dataloader object

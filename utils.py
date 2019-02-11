@@ -18,5 +18,5 @@ def maybe_download(source_url, filename, target_directory, filetype='folder', fo
       os.system('curl -o '+filepath+'.tar '+source_url)
       os.system('tar xzvf '+filepath+'.tar --directory '+target_directory)
       os.system('rm '+filepath+'.tar')
-    else:
-      os.system('wget -O '+filepath+' '+source_url)
+    elif filetype=='file':
+      os.system('curl -L -o '+filepath+' '+source_url)
