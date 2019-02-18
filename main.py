@@ -11,6 +11,8 @@ import torch.utils.data
 from time import time
 from utils import maybe_download, timenow
 from functools import reduce
+from matplotlib.pyplot import plot, imshow, colorbar, show, axis, hist, subplot, xlabel, ylabel, title, legend, savefig, figure, close, suptitle, tight_layout, xlim, ylim
+import matplotlib.pyplot as plt
 
 class Model():
 
@@ -38,14 +40,14 @@ class Model():
 
     with tf.name_scope('forward'):
 
-      self.H = tf.Variable(tf.truncated_normal([args.rank, nfeat], stddev=0.2, mean=0), name='H')
-      self.T = tf.Variable(tf.truncated_normal([args.rank, args.rank], stddev=0.2, mean=0), name='T')
+      self.H = tf.Variable(tf.random_poisson(shape=[args.rank, nfeat], lam=1.0), name='H')
+      self.T = tf.Variable(tf.random_poisson(shape=[args.rank, args.rank], lam=1.0), name='T')
 
       X = []
       self.W = []
       self.W_tran = []
       for t in range(ntime):
-        w = tf.Variable(tf.truncated_normal([nnode, args.rank], stddev=0.2, mean=0), name='W_'+str(t))
+        w = tf.Variable(tf.random_poisson(shape=[nnode, args.rank], lam=1.0), name='W_'+str(t))
         X.append(tf.matmul(w, self.H, name='X_'+str(t)))
         self.W.append(w)
         if t > 0: # add transition regularizer
@@ -72,8 +74,7 @@ class Model():
 
       self.loss = tf.add_n([self.crit, self.trancoef * self.tran, self.wdeccoef * self.wdec, self.nnegcoef * self.nneg], name='loss')
       self.step = tf.train.get_or_create_global_step()
-      self.trainop = tf.train.AdamOptimizer(self.lr).minimize(
-        self.loss, name='trainop', global_step=self.step)
+      self.trainop = tf.train.AdamOptimizer(self.lr).minimize(self.loss, name='trainop', global_step=self.step)
 
 
     tf.summary.scalar('train/crit', self.crit)
@@ -93,7 +94,7 @@ class Model():
 
     step = 0
     self.metrics = dict(loss=self.loss, crit=self.crit, tran=self.tran, wdec=self.wdec, nneg=self.nneg)
-    for epoch in range(args.nepoch):
+    for epoch in range(args.nepoc):
 
       # test over all test data
       running_crit = 0
@@ -107,7 +108,7 @@ class Model():
                                })
         running_crit += crit * len(batch)
       avg_crit = running_crit / len(testloader.dataset)
-      experiment.log_metric('test/crit', avg_crit, epoch)
+      experiment.log_metric('test/crit_epoch', avg_crit, step)
       print('TEST:\tepoch', epoch, '\tstep', step, '\tcrit', avg_crit)
 
       # train for an epoch
@@ -128,14 +129,47 @@ class Model():
           running_metrics = {k:v*len(batch) for (k,v) in metrics.items()}
         else:
           running_metrics = {k:rv+v*len(batch) for (k,v),(rk,rv) in zip(metrics.items(), running_metrics.items())}
-      metrics = {k:v/len(trainloader.dataset) for (k,v) in running_metrics.items()}
-      experiment.log_metrics(metrics, step=epoch)
+        if np.mod(step, 10)==0:
+          experiment.log_metrics(metrics, step=step)
+          self.plot()
+      avg_metrics = {k+'_epoch':v/len(trainloader.dataset) for (k,v) in running_metrics.items()}
+      experiment.log_metrics(avg_metrics, step=step)
       print('TRAIN:\tepoch', epoch, '\tstep', step, '\tcrit', metrics['crit'], '\tloss', metrics['loss'])
 
     print('done training')
 
   def get_params(self):
     return self.sess.run(dict(W=self.W, H=self.H, T=self.T))
+
+  def plot(self, plot_labels=False):
+    '''plot and save distributions'''
+
+    # distribution of labels
+    if plot_labels:
+      hist(labels, 200); xlim(-.1, 2); title('distribution-labels')
+      experiment.log_figure(figure=plt.gcf())
+      savefig(join(args.logdir, 'distribution-labels.jpg')); close('all')
+
+    # distribution of parameters
+    params = self.get_params()
+    T, H, W = params['T'], params['H'], params['W']
+    for i, w in enumerate(W):
+      figname = 'distribution-W_'+str(i)
+      hist(w.ravel(), 200); xlim(-.1, 2); title(figname)
+      experiment.log_figure(figure_name=figname, figure=plt.gcf())
+      close('all')
+    figname = 'distribution-H'
+    hist(H.ravel(), 200); xlim(-.1, 2); title(figname)
+    experiment.log_figure(figure_name=figname, figure=plt.gcf())
+    close('all')
+    figname = 'distribution-T'
+    hist(T.ravel(), 10); xlim(-.1, 2); title(figname)
+    experiment.log_figure(figure_name=figname, figure=plt.gcf())
+    close('all')
+
+    # dump W, H, T to disk
+    with open(join(args.logdir, 'learned_params.joblib'), 'wb') as f:
+      joblib.dump(params, f)
 
 class GraphDataset(torch.utils.data.Dataset):
   '''dataset object for the aml graph data with features extracted via refex'''
@@ -164,7 +198,7 @@ if __name__=='__main__':
   parser.add_argument('-trancoef', default=10, type=float)
   parser.add_argument('-wdeccoef', default=5e-5, type=float)
   parser.add_argument('-nnegcoef', default=1e-1, type=float)
-  parser.add_argument('-nepoch', default=1, type=int)
+  parser.add_argument('-nepoc', default=1, type=int)
   parser.add_argument('-gpu', default='0', type=str)
   parser.add_argument('-randname', action='store_true')
   args = parser.parse_args()
@@ -197,12 +231,5 @@ if __name__=='__main__':
   # run optimizer on training data
   model.fit(trainloader, testloader)
 
-  params = model.get_params()
-  W = reduce(lambda w1, w2: w1.ravel().append(w2.ravel()), params['W'])
-
-  # dump W, H, T to disk
-  with open(join(args.logdir, 'learned_params.joblib'), 'wb') as f:
-    joblib.dump(params, f)
-
-
-
+  # plot stuff
+  model.plot(plot_labels=True)

@@ -72,7 +72,6 @@ for idxfeat in range(nfeat):
   normalized = scaled / norm_mean[idxfeat]
 
   nonzero = np.nonzero(datacube[:,:,idxfeat])
-  # datacube[nonzero[0], nonzero[1], idxfeat] = ( scalingfun(datacube[nonzero[0], nonzero[1], idxfeat]) - norm_mean[idxfeat] ) / norm_std[idxfeat]
   datacube[nonzero[0], nonzero[1], idxfeat] = scalingfun(datacube[nonzero[0], nonzero[1], idxfeat]) / norm_mean[idxfeat]
 
   # plot
