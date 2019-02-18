@@ -19,7 +19,7 @@ for rank in range(10, 22):
 
     # if list hasn't been built up yet (first nproc iterations)
     if len(processes) < nproc:
-      gpu = np.mod(i,3)
+      gpu = np.mod(len(processes),3)
       process = Process(target=run, args=[rank, gpu])
       process.start()
       processes = processes + [process]
