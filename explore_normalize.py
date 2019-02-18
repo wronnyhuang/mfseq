@@ -12,8 +12,8 @@ from shutil import rmtree
 from time import sleep
 
 home = os.environ['HOME']
-dataroot = join(home, 'datasets/everbank_graph')
-imageroot = join(dataroot, 'tmp')
+dataroot = join(home, 'datasets/graph_data_explore')
+imageroot = join(dataroot, 'images')
 makedirs(imageroot, exist_ok=True)
 
 datacube = []
@@ -59,17 +59,23 @@ for idxfeat in range(nfeat):
     continue
 
   # possibly swithc to log scale and then normalize
-  scalingfun = np.log10 if idxfeat in idxlog else lambda x: x
-  normalized = scalingfun(featMarginal)
+  def logpositive(input):
+    output = np.log10(input)
+    output = output - np.min(output)
+    return output
+
+  scalingfun = logpositive if idxfeat in idxlog else lambda x: x
+  scaled = scalingfun(featMarginal)
 
   # update datacube's column to have normalized values and save normalized mean and std for future reference
-  norm_mean[idxfeat] = normalized.mean()
-  norm_std[idxfeat] = normalized.std()
-  normalized = ( normalized - norm_mean[idxfeat] ) / norm_std[idxfeat]
+  norm_mean[idxfeat] = scaled.mean()
+  normalized = scaled / norm_mean[idxfeat]
+  # norm_std[idxfeat] = normalized.std()
+  # normalized = ( normalized - norm_mean[idxfeat] ) / norm_std[idxfeat]
 
-  # datacube[:,:,idxfeat] = ( scalingfun(datacube[:,:,idxfeat]) - norm_mean[idxfeat] ) / norm_std[idxfeat]
   nonzero = np.nonzero(datacube[:,:,idxfeat])
-  datacube[nonzero[0], nonzero[1], idxfeat] = ( scalingfun(datacube[nonzero[0], nonzero[1], idxfeat]) - norm_mean[idxfeat] ) / norm_std[idxfeat]
+  # datacube[nonzero[0], nonzero[1], idxfeat] = ( scalingfun(datacube[nonzero[0], nonzero[1], idxfeat]) - norm_mean[idxfeat] ) / norm_std[idxfeat]
+  datacube[nonzero[0], nonzero[1], idxfeat] = scalingfun(datacube[nonzero[0], nonzero[1], idxfeat]) / norm_mean[idxfeat]
 
   # slice = datacube[:, :, idxfeat]
   # condition = np.logical_and(slice > -1e6, np.abs(slice) > 1e-8)
@@ -78,40 +84,42 @@ for idxfeat in range(nfeat):
 
 
 
-  # # plot
-  # figure(figsize=(7.5,3))
-  # suptitle('feature id: '+str(idxfeat))
-  #
-  # subplot(1,3,1)
-  # hist(featMarginal, 50, color='red')
-  # xlabel('feature value')
-  # title('linear scale')
-  #
-  # subplot(1,3,2)
-  # hist(np.log10(featMarginal), 50)
-  # xlabel('log feature value')
-  # title('log scale')
-  #
-  # subplot(1,3,3)
-  # logstr = 'log ' if idxfeat in idxlog else ''
-  # hist(normalized, 50, color='green')
-  # xlabel('new feature value')
-  # title(logstr+'normalized')
-  #
-  # tight_layout(pad=1.5)
-  # savefig(join(imageroot, str(idxfeat)+'.jpg'))
-  # close('all')
-  # sleep(.3)
+  # plot
+  figure(figsize=(7.5,3))
+  suptitle('feature id: '+str(idxfeat))
+
+  subplot(1,3,1)
+  hist(featMarginal, 50, color='red')
+  xlabel('feature value')
+  title('linear scale')
+
+  subplot(1,3,2)
+  hist(np.log10(featMarginal), 50)
+  xlabel('log feature value')
+  title('log scale')
+
+  subplot(1,3,3)
+  logstr = 'log ' if idxfeat in idxlog else ''
+  hist(normalized, 50, color='green')
+  xlabel('new feature value')
+  title(logstr+'normalized')
+
+  tight_layout(pad=1.5)
+  savefig(join(imageroot, str(idxfeat)+'.jpg'))
+  close('all')
+  sleep(.3)
   print(idxfeat)
 
 ##
+
+datacube = datacube[:, :, 1:]
 
 # get nonzero indices and their corresponding values in datacube so we can table-ize the cube
 indices = np.argwhere(np.logical_and(datacube > -1e8, np.abs(datacube) > 1e-8))
 indices = indices.transpose()
 labels = datacube[indices[0], indices[1], indices[2]]
 
-with gzip.open('datatable.pkl', 'wb') as f:
+with gzip.open('graph_data_table.pkl', 'wb') as f:
   pickle.dump((indices, labels, datacube.shape), f)
 
 with open('norm_mean_std.pkl', 'wb') as f:

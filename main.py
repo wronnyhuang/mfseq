@@ -26,6 +26,7 @@ class Model():
       self.lr = tf.placeholder(tf.float32, [], name='lr')
       self.trancoef = tf.placeholder(tf.float32, [], name='trancoef')
       self.wdeccoef = tf.placeholder(tf.float32, [], name='wdeccoef')
+      self.nnegcoef = tf.placeholder(tf.float32, [], name='nnegcoef')
 
     with tf.name_scope('inputs'):
       self.timeidx = tf.placeholder(tf.int32, [None], name='timeidx')
@@ -56,7 +57,6 @@ class Model():
         indices = self.timeidx*nnode*nfeat + self.nodeidx*nfeat + self.featidx
       self.preds = tf.gather(Xflat, indices, name='Xgather')
 
-
     with tf.name_scope('loss'):
       criterion = tf.losses.mean_squared_error
       with tf.name_scope('criterion'):
@@ -64,10 +64,11 @@ class Model():
       with tf.name_scope('transition'):
         self.tran = tf.add_n([criterion(w_tran, w) for w_tran, w in zip(self.W_tran, self.W[1:])]) / len(self.W_tran)
       with tf.name_scope('weight_decay'):
-        self.wdec = tf.global_norm(tf.trainable_variables())
+        self.wdec = tf.global_norm(tf.trainable_variables())**2
+      with tf.name_scope('nonneg'):
+        self.nneg = tf.global_norm([tf.nn.relu(-t) for t in tf.trainable_variables()])**2
 
-
-      self.loss = tf.add_n([self.crit, self.trancoef * self.tran, self.wdeccoef * self.wdec], name='loss')
+      self.loss = tf.add_n([self.crit, self.trancoef * self.tran, self.wdeccoef * self.wdec, self.nnegcoef * self.nneg], name='loss')
       self.step = tf.train.get_or_create_global_step()
       self.trainop = tf.train.AdamOptimizer(self.lr).minimize(
         self.loss, name='trainop', global_step=self.step)
@@ -89,7 +90,7 @@ class Model():
     '''fit the model to the data presented in the input dataloader'''
 
     step = 0
-    self.metrics = dict(loss=self.loss, crit=self.crit, tran=self.tran, wdec=self.wdec)
+    self.metrics = dict(loss=self.loss, crit=self.crit, tran=self.tran, wdec=self.wdec, nneg=self.nneg)
     for epoch in range(args.nepoch):
 
       # test over all test data
@@ -119,6 +120,7 @@ class Model():
                             self.lr: args.lrnrate,
                             self.trancoef: args.trancoef,
                             self.wdeccoef: args.wdeccoef,
+                            self.nnegcoef: args.nnegcoef,
                             })
         if i==0:
           running_metrics = {k:v*len(batch) for (k,v) in metrics.items()}
@@ -151,10 +153,11 @@ if __name__=='__main__':
   parser = argparse.ArgumentParser()
   parser.add_argument('-name', default='debug', type=str)
   parser.add_argument('-rank', default=3, type=int)
-  parser.add_argument('-batchsize', default=200000, type=int)
+  parser.add_argument('-batchsize', default=20000, type=int)
   parser.add_argument('-lrnrate', default=.1, type=float)
-  parser.add_argument('-trancoef', default=1, type=float)
-  parser.add_argument('-wdeccoef', default=1e-4, type=float)
+  parser.add_argument('-trancoef', default=10, type=float)
+  parser.add_argument('-wdeccoef', default=5e-5, type=float)
+  parser.add_argument('-nnegcoef', default=1e-1, type=float)
   parser.add_argument('-nepoch', default=200, type=int)
   parser.add_argument('-gpu', default='0', type=str)
   parser.add_argument('-randname', action='store_true')
@@ -173,7 +176,7 @@ if __name__=='__main__':
   os.environ['CUDA_VISIBLE_DEVICES'] = args.gpu
 
   # load data from file
-  maybe_download('https://www.dropbox.com/s/pc8qggvvm2gfebl/graph_data_table.pkl?dl=0',
+  maybe_download('https://www.dropbox.com/s/cdu4xx8vnavkvz3/graph_data_table.pkl?dl=0',
                  'graph_data_table.pkl', join(home, 'datasets'), filetype='file')
   with gzip.open(join(home, 'datasets', 'graph_data_table.pkl'), 'rb') as f:
     (timeidx, nodeidx, featidx), labels, (ntime, nnode, nfeat) = pickle.load(f)
