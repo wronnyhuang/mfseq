@@ -70,19 +70,10 @@ for idxfeat in range(nfeat):
   # update datacube's column to have normalized values and save normalized mean and std for future reference
   norm_mean[idxfeat] = scaled.mean()
   normalized = scaled / norm_mean[idxfeat]
-  # norm_std[idxfeat] = normalized.std()
-  # normalized = ( normalized - norm_mean[idxfeat] ) / norm_std[idxfeat]
 
   nonzero = np.nonzero(datacube[:,:,idxfeat])
   # datacube[nonzero[0], nonzero[1], idxfeat] = ( scalingfun(datacube[nonzero[0], nonzero[1], idxfeat]) - norm_mean[idxfeat] ) / norm_std[idxfeat]
   datacube[nonzero[0], nonzero[1], idxfeat] = scalingfun(datacube[nonzero[0], nonzero[1], idxfeat]) / norm_mean[idxfeat]
-
-  # slice = datacube[:, :, idxfeat]
-  # condition = np.logical_and(slice > -1e6, np.abs(slice) > 1e-8)
-  # slice = slice[condition]
-  # condition = np.argwhere(condition)
-
-
 
   # plot
   figure(figsize=(7.5,3))

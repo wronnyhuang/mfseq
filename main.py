@@ -6,9 +6,11 @@ import os
 from os.path import join, basename, dirname, exists
 import pickle
 import gzip
+import joblib
 import torch.utils.data
 from time import time
 from utils import maybe_download, timenow
+from functools import reduce
 
 class Model():
 
@@ -36,18 +38,18 @@ class Model():
 
     with tf.name_scope('forward'):
 
-      H = tf.Variable(tf.truncated_normal([args.rank, nfeat], stddev=0.2, mean=0), name='H')
-      T = tf.Variable(tf.truncated_normal([args.rank, args.rank], stddev=0.2, mean=0), name='Tres')
+      self.H = tf.Variable(tf.truncated_normal([args.rank, nfeat], stddev=0.2, mean=0), name='H')
+      self.T = tf.Variable(tf.truncated_normal([args.rank, args.rank], stddev=0.2, mean=0), name='T')
 
       X = []
       self.W = []
       self.W_tran = []
       for t in range(ntime):
         w = tf.Variable(tf.truncated_normal([nnode, args.rank], stddev=0.2, mean=0), name='W_'+str(t))
-        X.append(tf.matmul(w, H, name='X_'+str(t)))
+        X.append(tf.matmul(w, self.H, name='X_'+str(t)))
         self.W.append(w)
         if t > 0: # add transition regularizer
-          w_tran = tf.matmul(self.W[-2], T, name='W_tran_'+str(t))
+          w_tran = tf.matmul(self.W[-2], self.T, name='W_tran_'+str(t))
           self.W_tran.append(w_tran)
 
     with tf.name_scope('predictions'):
@@ -130,6 +132,10 @@ class Model():
       experiment.log_metrics(metrics, step=epoch)
       print('TRAIN:\tepoch', epoch, '\tstep', step, '\tcrit', metrics['crit'], '\tloss', metrics['loss'])
 
+    print('done training')
+
+  def get_params(self):
+    return self.sess.run(dict(W=self.W, H=self.H, T=self.T))
 
 class GraphDataset(torch.utils.data.Dataset):
   '''dataset object for the aml graph data with features extracted via refex'''
@@ -158,7 +164,7 @@ if __name__=='__main__':
   parser.add_argument('-trancoef', default=10, type=float)
   parser.add_argument('-wdeccoef', default=5e-5, type=float)
   parser.add_argument('-nnegcoef', default=1e-1, type=float)
-  parser.add_argument('-nepoch', default=200, type=int)
+  parser.add_argument('-nepoch', default=1, type=int)
   parser.add_argument('-gpu', default='0', type=str)
   parser.add_argument('-randname', action='store_true')
   args = parser.parse_args()
@@ -190,6 +196,13 @@ if __name__=='__main__':
 
   # run optimizer on training data
   model.fit(trainloader, testloader)
+
+  params = model.get_params()
+  W = reduce(lambda w1, w2: w1.ravel().append(w2.ravel()), params['W'])
+
+  # dump W, H, T to disk
+  with open(join(args.logdir, 'learned_params.joblib'), 'wb') as f:
+    joblib.dump(params, f)
 
 
 
