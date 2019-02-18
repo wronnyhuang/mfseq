@@ -40,14 +40,14 @@ class Model():
 
     with tf.name_scope('forward'):
 
-      self.H = tf.Variable(tf.random_poisson(shape=[args.rank, nfeat], lam=1.0), name='H')
-      self.T = tf.Variable(tf.random_poisson(shape=[args.rank, args.rank], lam=1.0), name='T')
+      self.H = tf.Variable(tf.random_gamma(shape=[args.rank, nfeat], alpha=1.0), name='H')
+      self.T = tf.Variable(tf.random_gamma(shape=[args.rank, args.rank], alpha=1.0), name='T')
 
       X = []
       self.W = []
       self.W_tran = []
       for t in range(ntime):
-        w = tf.Variable(tf.random_poisson(shape=[nnode, args.rank], lam=1.0), name='W_'+str(t))
+        w = tf.Variable(tf.random_gamma(shape=[nnode, args.rank], alpha=1.0), name='W_'+str(t))
         X.append(tf.matmul(w, self.H, name='X_'+str(t)))
         self.W.append(w)
         if t > 0: # add transition regularizer
@@ -89,6 +89,25 @@ class Model():
     self.sess.run(tf.global_variables_initializer())
     self.writer = tf.summary.FileWriter(self.args.logdir, graph=self.sess.graph)
 
+  def test(self, testloader, step):
+    '''test on entire test set'''
+
+    # test over all test data
+    running_crit = 0
+    for i, batch in enumerate(testloader):
+      timeidx, nodeidx, featidx, labels = batch.numpy().transpose()
+      crit, = self.sess.run([self.crit],
+                            {self.timeidx: timeidx,
+                             self.nodeidx: nodeidx,
+                             self.featidx: featidx,
+                             self.labels: labels,
+                             })
+      running_crit += crit * len(batch)
+    avg_crit = running_crit / len(testloader.dataset)
+    experiment.log_metric('test/crit', avg_crit, step)
+    print('TEST:\tstep', step, '\tcrit', avg_crit)
+
+
   def fit(self, trainloader, testloader):
     '''fit the model to the data presented in the input dataloader'''
 
@@ -96,59 +115,35 @@ class Model():
     self.metrics = dict(loss=self.loss, crit=self.crit, tran=self.tran, wdec=self.wdec, nneg=self.nneg)
     for epoch in range(args.nepoc):
 
-      # test over all test data
-      running_crit = 0
-      for i, batch in enumerate(testloader):
-        timeidx, nodeidx, featidx, labels = batch.numpy().transpose()
-        crit, = self.sess.run([self.crit],
-                              {self.timeidx: timeidx,
-                               self.nodeidx: nodeidx,
-                               self.featidx: featidx,
-                               self.labels: labels,
-                               })
-        running_crit += crit * len(batch)
-      avg_crit = running_crit / len(testloader.dataset)
-      experiment.log_metric('test/crit_epoch', avg_crit, step)
-      print('TEST:\tepoch', epoch, '\tstep', step, '\tcrit', avg_crit)
-
       # train for an epoch
       for i, batch in enumerate(trainloader):
 
+        dropfactor = 10 if step > args.lrdrop else 1
         timeidx, nodeidx, featidx, labels = batch.numpy().transpose()
         _, metrics, step = self.sess.run([self.trainop, self.metrics, self.step],
                            {self.timeidx: timeidx,
                             self.nodeidx: nodeidx,
                             self.featidx: featidx,
                             self.labels: labels,
-                            self.lr: args.lrnrate,
+                            self.lr: args.lrnrate / dropfactor,
                             self.trancoef: args.trancoef,
                             self.wdeccoef: args.wdeccoef,
                             self.nnegcoef: args.nnegcoef,
                             })
-        if i==0:
-          running_metrics = {k:v*len(batch) for (k,v) in metrics.items()}
-        else:
-          running_metrics = {k:rv+v*len(batch) for (k,v),(rk,rv) in zip(metrics.items(), running_metrics.items())}
-        if np.mod(step, 10)==0:
+        if np.mod(step, args.logtrain)==0:
           experiment.log_metrics(metrics, step=step)
-          self.plot()
-      avg_metrics = {k+'_epoch':v/len(trainloader.dataset) for (k,v) in running_metrics.items()}
-      experiment.log_metrics(avg_metrics, step=step)
-      print('TRAIN:\tepoch', epoch, '\tstep', step, '\tcrit', metrics['crit'], '\tloss', metrics['loss'])
+          print('TRAIN:\tepoch', epoch, '\tstep', step, '\tcrit', metrics['crit'], '\tloss', metrics['loss'])
+        if np.mod(step, args.logtest)==0:
+          self.test(testloader, step)
+          if args.logimage: self.plot()
 
     print('done training')
 
   def get_params(self):
     return self.sess.run(dict(W=self.W, H=self.H, T=self.T))
 
-  def plot(self, plot_labels=False):
+  def plot(self, ending=False):
     '''plot and save distributions'''
-
-    # distribution of labels
-    if plot_labels:
-      hist(labels, 200); xlim(-.1, 2); title('distribution-labels')
-      experiment.log_figure(figure=plt.gcf())
-      savefig(join(args.logdir, 'distribution-labels.jpg')); close('all')
 
     # distribution of parameters
     params = self.get_params()
@@ -167,9 +162,17 @@ class Model():
     experiment.log_figure(figure_name=figname, figure=plt.gcf())
     close('all')
 
-    # dump W, H, T to disk
-    with open(join(args.logdir, 'learned_params.joblib'), 'wb') as f:
-      joblib.dump(params, f)
+    if ending:
+
+      # plot distribution of labels
+      hist(labels, 200); xlim(-.1, 2); title('distribution-labels')
+      experiment.log_figure(figure=plt.gcf())
+      savefig(join(args.logdir, 'distribution-labels.jpg')); close('all')
+
+      # dump W, H, T to disk
+      with open(join(args.logdir, 'learned_params.joblib'), 'wb') as f:
+        joblib.dump(params, f)
+      experiment.log_asset(file_like_object=f)
 
 class GraphDataset(torch.utils.data.Dataset):
   '''dataset object for the aml graph data with features extracted via refex'''
@@ -192,19 +195,23 @@ if __name__=='__main__':
   # parse terminal arguments
   parser = argparse.ArgumentParser()
   parser.add_argument('-name', default='debug', type=str)
-  parser.add_argument('-rank', default=3, type=int)
+  parser.add_argument('-rank', default=10, type=int)
   parser.add_argument('-batchsize', default=20000, type=int)
   parser.add_argument('-lrnrate', default=.1, type=float)
+  parser.add_argument('-lrdrop', default=70, type=int)
   parser.add_argument('-trancoef', default=10, type=float)
   parser.add_argument('-wdeccoef', default=5e-5, type=float)
   parser.add_argument('-nnegcoef', default=1e-1, type=float)
   parser.add_argument('-nepoc', default=1, type=int)
+  parser.add_argument('-logtrain', default=2, type=int)
+  parser.add_argument('-logtest', default=5, type=int)
   parser.add_argument('-gpu', default='0', type=str)
+  parser.add_argument('-logimage', action='store_true')
   parser.add_argument('-randname', action='store_true')
   args = parser.parse_args()
 
   # comet experiement
-  experiment = Experiment(api_key="vPCPPZrcrUBitgoQkvzxdsh9k", parse_args=False, project_name='nmf')
+  experiment = Experiment(api_key="vPCPPZrcrUBitgoQkvzxdsh9k", parse_args=False, project_name='nmf-ranksweep')
   experiment.log_parameters(vars(args))
 
   # front matter
@@ -232,4 +239,4 @@ if __name__=='__main__':
   model.fit(trainloader, testloader)
 
   # plot stuff
-  model.plot(plot_labels=True)
+  model.plot(ending=True)
