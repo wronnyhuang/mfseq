@@ -3,7 +3,7 @@ from comet_ml import API
 from matplotlib.pyplot import plot, imshow, colorbar, show, axis, hist, subplot, xlabel, ylabel, title, legend, savefig, figure, close, suptitle, tight_layout, xlim, ylim
 
 api = API(rest_api_key='W2gBYYtc8ZbGyyNct5qYGR2Gl')
-experiments = api.get('wronnyhuang/nmf-sweeprank')
+experiments = api.get('wronnyhuang/nmf-ranksweep')
 
 ranks = []
 errors = []

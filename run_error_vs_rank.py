@@ -9,7 +9,7 @@ def run(rank, gpu):
 
 nproc = 6
 processes = []
-for rank in range(10, 22):
+for rank in range(3, 150):
 
   i = 0
   while True:  # cycle iterate through the length of the list (nproc)

@@ -167,12 +167,11 @@ class Model():
       # plot distribution of labels
       hist(labels, 200); xlim(-.1, 2); title('distribution-labels')
       experiment.log_figure(figure=plt.gcf())
-      savefig(join(args.logdir, 'distribution-labels.jpg')); close('all')
 
       # dump W, H, T to disk
       with open(join(args.logdir, 'learned_params.joblib'), 'wb') as f:
         joblib.dump(params, f)
-      experiment.log_asset(file_like_object=f)
+        experiment.log_asset(join(args.logdir, 'learned_params.joblib'))
 
 class GraphDataset(torch.utils.data.Dataset):
   '''dataset object for the aml graph data with features extracted via refex'''
@@ -218,6 +217,7 @@ if __name__=='__main__':
   home = os.environ['HOME']
   autoname = 'rank_%s/lr_%s/wdeccoef_%s' % (args.rank, args.lrnrate, args.wdeccoef)
   experiment.set_name(autoname)
+  args.name = autoname
   args.logdir = join(home, 'ckpt', args.name)
   os.makedirs(args.logdir, exist_ok=True)
   os.environ['CUDA_VISIBLE_DEVICES'] = args.gpu
