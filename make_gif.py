@@ -40,5 +40,5 @@ pool = Pool()
 images = pool.map(parallel, list_images)
 
 print('Combining images into gif')
-imageio.mimsave(outFile, images, 'GIF', duration=.2)
+imageio.mimsave(outFile, images, 'GIF', duration=.1)
 print('gif saved in '+str(outFile))
