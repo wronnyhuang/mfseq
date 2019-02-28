@@ -14,6 +14,25 @@ from functools import reduce
 from matplotlib.pyplot import plot, imshow, colorbar, show, axis, hist, subplot, xlabel, ylabel, title, legend, savefig, figure, close, suptitle, tight_layout, xlim, ylim
 import matplotlib.pyplot as plt
 
+# parse terminal arguments
+parser = argparse.ArgumentParser()
+parser.add_argument('-gpu', default='0', type=str)
+parser.add_argument('-name', default='debug', type=str)
+parser.add_argument('-rank', default=10, type=int)
+parser.add_argument('-batchsize', default=20000, type=int)
+parser.add_argument('-lrnrate', default=.1, type=float)
+parser.add_argument('-lrdrop', default=70, type=int)
+parser.add_argument('-trancoef', default=10, type=float)
+parser.add_argument('-wdeccoef', default=5e-5, type=float)
+parser.add_argument('-nnegcoef', default=1e-1, type=float)
+parser.add_argument('-maxgradnorm', default=10, type=float)
+parser.add_argument('-nepoc', default=1, type=int)
+parser.add_argument('-logtrain', default=2, type=int)
+parser.add_argument('-logtest', default=5, type=int)
+parser.add_argument('-logimage', action='store_true')
+parser.add_argument('-randname', action='store_true')
+args = parser.parse_args()
+
 class Model():
 
   def __init__(self, args):
@@ -22,6 +41,7 @@ class Model():
     self.args = args
     self.build_graph()
     self.build_sess()
+
 
   def build_graph(self):
     '''build computational graph'''
@@ -40,8 +60,8 @@ class Model():
 
     with tf.name_scope('forward'):
 
-      self.H = tf.Variable(tf.random_gamma(shape=[args.rank, nfeat], alpha=1.0), name='H')
-      self.T = tf.Variable(tf.random_gamma(shape=[args.rank, args.rank], alpha=1.0), name='T')
+      self.H = tf.Variable(tf.random_gamma(shape=[args.rank, nfeat], alpha=1.0), name='H', trainable=False)
+      self.T = tf.Variable(tf.random_gamma(shape=[args.rank, args.rank], alpha=1.0), name='T', trainable=False)
 
       X = []
       self.W = []
@@ -72,15 +92,25 @@ class Model():
       with tf.name_scope('nonneg'):
         self.nneg = tf.global_norm([tf.nn.relu(-t) for t in tf.trainable_variables()])**2
 
-      self.loss = tf.add_n([self.crit, self.trancoef * self.tran, self.wdeccoef * self.wdec, self.nnegcoef * self.nneg], name='loss')
-      self.step = tf.train.get_or_create_global_step()
-      self.trainop = tf.train.AdamOptimizer(self.lr).minimize(self.loss, name='trainop', global_step=self.step)
+      # linearly combine all the losses into the final training objective
+      self.loss = tf.add_n([self.wdeccoef * self.wdec, self.nnegcoef * self.nneg], name='loss')
 
+    with tf.name_scope('trainop'):
+      # keep track of training step
+      self.step = tf.train.get_or_create_global_step()
+      # clip gradients by a max norm value
+      opt = tf.train.AdamOptimizer(self.lr)
+      grads = tf.gradients(self.loss, tf.trainable_variables())
+      self.grads = grads
+      grads, self.gradnorm = tf.clip_by_global_norm(grads, args.maxgradnorm)
+      # training op
+      self.trainop = opt.apply_gradients(zip(grads, tf.trainable_variables()), global_step=self.step, name='trainop')
 
     tf.summary.scalar('train/crit', self.crit)
     tf.summary.scalar('train/loss', self.loss)
     tf.summary.scalar('lr', self.lr)
     self.merged = tf.summary.merge_all()
+
 
   def build_sess(self):
     '''start tf session'''
@@ -88,6 +118,7 @@ class Model():
     self.sess = tf.Session(config=tf.ConfigProto(allow_soft_placement=True, gpu_options=tf.GPUOptions(allow_growth=True)))
     self.sess.run(tf.global_variables_initializer())
     self.writer = tf.summary.FileWriter(self.args.logdir, graph=self.sess.graph)
+
 
   def test(self, testloader, step):
     '''test on entire test set'''
@@ -112,20 +143,21 @@ class Model():
     '''fit the model to the data presented in the input dataloader'''
 
     step = 0
-    self.metrics = dict(loss=self.loss, crit=self.crit, tran=self.tran, wdec=self.wdec, nneg=self.nneg)
+    self.metrics = dict(loss=self.loss, crit=self.crit, tran=self.tran, wdec=self.wdec, nneg=self.nneg, gradnorm=self.gradnorm, grads=self.grads)
     for epoch in range(args.nepoc):
 
       # train for an epoch
       for i, batch in enumerate(trainloader):
 
-        dropfactor = 10 if step > args.lrdrop else 1
+        dropfactor = 0.1 if step > args.lrdrop else 1
+        warmfactor = np.clip(step/5, 0, 1)
         timeidx, nodeidx, featidx, labels = batch.numpy().transpose()
-        _, metrics, step = self.sess.run([self.trainop, self.metrics, self.step],
+        _, metrics, step, = self.sess.run([self.trainop, self.metrics, self.step],
                            {self.timeidx: timeidx,
                             self.nodeidx: nodeidx,
                             self.featidx: featidx,
                             self.labels: labels,
-                            self.lr: args.lrnrate / dropfactor,
+                            self.lr: args.lrnrate * dropfactor * warmfactor,
                             self.trancoef: args.trancoef,
                             self.wdeccoef: args.wdeccoef,
                             self.nnegcoef: args.nnegcoef,
@@ -139,8 +171,10 @@ class Model():
 
     print('done training')
 
+
   def get_params(self):
     return self.sess.run(dict(W=self.W, H=self.H, T=self.T))
+
 
   def plot(self, ending=False):
     '''plot and save distributions'''
@@ -173,6 +207,7 @@ class Model():
         joblib.dump(params, f)
         experiment.log_asset(join(args.logdir, 'learned_params.joblib'))
 
+
 class GraphDataset(torch.utils.data.Dataset):
   '''dataset object for the aml graph data with features extracted via refex'''
 
@@ -190,24 +225,6 @@ class GraphDataset(torch.utils.data.Dataset):
 
 
 if __name__=='__main__':
-
-  # parse terminal arguments
-  parser = argparse.ArgumentParser()
-  parser.add_argument('-name', default='debug', type=str)
-  parser.add_argument('-rank', default=10, type=int)
-  parser.add_argument('-batchsize', default=20000, type=int)
-  parser.add_argument('-lrnrate', default=.1, type=float)
-  parser.add_argument('-lrdrop', default=70, type=int)
-  parser.add_argument('-trancoef', default=10, type=float)
-  parser.add_argument('-wdeccoef', default=5e-5, type=float)
-  parser.add_argument('-nnegcoef', default=1e-1, type=float)
-  parser.add_argument('-nepoc', default=1, type=int)
-  parser.add_argument('-logtrain', default=2, type=int)
-  parser.add_argument('-logtest', default=5, type=int)
-  parser.add_argument('-gpu', default='0', type=str)
-  parser.add_argument('-logimage', action='store_true')
-  parser.add_argument('-randname', action='store_true')
-  args = parser.parse_args()
 
   # comet experiement
   experiment = Experiment(api_key="vPCPPZrcrUBitgoQkvzxdsh9k", parse_args=False, project_name='nmf-ranksweep')
