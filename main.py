@@ -22,8 +22,8 @@ parser.add_argument('-rank', default=10, type=int)
 parser.add_argument('-batchsize', default=20000, type=int)
 parser.add_argument('-lrnrate', default=.1, type=float)
 parser.add_argument('-lrdrop', default=70, type=int)
-parser.add_argument('-trancoef', default=10, type=float)
-parser.add_argument('-wdeccoef', default=5e-5, type=float)
+parser.add_argument('-trancoef', default=.1, type=float)
+parser.add_argument('-wdeccoef', default=5e-3, type=float)
 parser.add_argument('-nnegcoef', default=1e-1, type=float)
 parser.add_argument('-maxgradnorm', default=10, type=float)
 parser.add_argument('-nepoc', default=100, type=int)
@@ -48,37 +48,38 @@ class Model():
 
     with tf.name_scope('inputs'):
       self.lr = tf.placeholder(tf.float32, [], name='lr')
-      self.X_true = tf.placeholder(tf.float32, datacube.shape, name='labels')
-      self.gategrad = tf.placeholder(tf.float32, datacube.shape, name='labels')
+      self.X_true = tf.placeholder(tf.float32, datacube.shape, name='X_true')
+      self.gategrad = tf.placeholder(tf.float32, datacube.shape, name='gategrad')
 
     with tf.name_scope('forward'):
       self.H = tf.Variable(tf.random_gamma(shape=[args.rank, nfeat], alpha=1.0), name='H', trainable=False)
       self.T = tf.Variable(tf.random_gamma(shape=[args.rank, args.rank], alpha=1.0), name='T', trainable=False)
-      X = []
       self.W = []
-      self.W_tran = []
+      X_pred = []
+      X_tran = []
+
       for t in range(ntime):
         w = tf.Variable(tf.random_gamma(shape=[nnode, args.rank], alpha=1.0), name='W_'+str(t))
-        X.append(tf.matmul(w, self.H, name='X_'+str(t)))
+        X_pred.append(tf.matmul(w, self.H, name='X_pred_'+str(t)))
         self.W.append(w)
-        if t > 0: # add transition regularizer
-          w_tran = tf.matmul(self.W[-2], self.T, name='W_tran_'+str(t))
-          self.W_tran.append(w_tran)
-      X = tf.stack(X, axis=0, name='X')
+        if t >= 2: # add transition regularizer
+          x_tran = tf.add(tf.matmul(tf.matmul(self.W[-3], self.W[-3]), self.T), tf.matmul(self.W[-2], self.T), name='X_tran_'+str(t))
+          X_tran.append(x_tran)
+      X_pred = tf.stack(X_pred, axis=0, name='X_pred')
 
     criterion = tf.losses.mean_squared_error
 
     with tf.name_scope('regularizers'):
       with tf.name_scope('transition'):
-        self.tran = tf.add_n([criterion(w_tran, w) for w_tran, w in zip(self.W_tran, self.W[1:])]) / len(self.W_tran)
+        self.tran = tf.add_n([criterion(x_true, x_pred) for x_true, x_pred in zip(self.X_true[2:], self.X_tran]) / len(self.X_tran)
       with tf.name_scope('weight_decay'):
-        self.wdec = tf.global_norm(tf.trainable_variables())**2
+        self.wdec = tf.global_norm(tf.trainable_variables())
       with tf.name_scope('nonneg'):
         self.nneg = tf.global_norm([tf.nn.relu(-t) for t in tf.trainable_variables()])**2
 
     with tf.name_scope('loss'):
-      self.crit = criterion(X, self.X_true)
-      self.loss = tf.add_n([self.crit, args.wdeccoef * self.wdec, args.nnegcoef * self.nneg], name='loss')
+      self.crit = criterion(X_pred, self.X_true)
+      self.loss = tf.add_n([(1-args.trancoef) * self.crit, args.trancoef * self.tran, args.wdeccoef * self.wdec, args.nnegcoef * self.nneg], name='loss')
 
     with tf.name_scope('train_ops'):
       # keep track of training step
@@ -86,15 +87,15 @@ class Model():
       # clip gradients by a max norm value
       opt = tf.train.AdamOptimizer(self.lr)
       grads = tf.gradients(self.loss, tf.trainable_variables())
-      # grads, self.gradnorm = tf.clip_by_global_norm(grads, args.maxgradnorm)
+      grads, self.gradnorm = tf.clip_by_global_norm(grads, args.maxgradnorm)
       # training op
       self.trainop = opt.apply_gradients(zip(grads, tf.trainable_variables()), global_step=self.step, name='trainop')
 
-    # tensorboard summaries
-    tf.summary.scalar('train/crit', self.crit)
-    tf.summary.scalar('train/loss', self.loss)
-    tf.summary.scalar('lr', self.lr)
-    self.merged = tf.summary.merge_all()
+    # # tensorboard summaries
+    # tf.summary.scalar('train/crit', self.crit)
+    # tf.summary.scalar('train/loss', self.loss)
+    # tf.summary.scalar('lr', self.lr)
+    # self.merged = tf.summary.merge_all()
 
 
   def build_sess(self):
