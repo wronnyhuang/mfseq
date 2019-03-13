@@ -29,7 +29,7 @@ $\underset{W_i, H}{\mathrm{argmin}}\; \alpha\sum_{i=1}^N \left\lVert W_i H - X_i
 (1-\alpha)\sum_{i=3}^N \left\lVert W_i H - (W_{i-2}T^2H + W_i T H) \right\rVert^2 + 
 \beta\sum_{i=1}^N \left\lVert W_i \right\rVert_{2,1}^2 + 
 \kappa\left\lVert H \right\rVert_{1,2}^2 + 
-\eta\sum_{\mathrm{all\ elements}\left\lVert \mathrm{relu}([W, H]) \right\rVert^2 $
+\eta\sum_{\mathrm{all\ elements}}\left\lVert \mathrm{relu}([W, H]) \right\rVert^2 $
 
 The trainable variables are $T, W_0, and H$, which we also l2-regularize to improve generalization.
 
