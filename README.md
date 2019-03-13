@@ -17,6 +17,53 @@ each with a decomposition of
 
 subject to a transition rule based on transition matrix <img src="/tex/2f118ee06d05f3c2d98361d9c30e38ce.svg?invert_in_darkmode&sanitize=true" align=middle width=11.889314249999991pt height=22.465723500000017pt/>
 
-<img src="/tex/01a4ed6e24ddd741977314020f649473.svg?invert_in_darkmode&sanitize=true" align=middle width=165.23023439999997pt height=26.76175259999998pt/>H<img src="/tex/25e98a79b8f6c8b0da242a82ff40481e.svg?invert_in_darkmode&sanitize=true" align=middle width=469.4697579pt height=22.831056599999986pt/>W_i<img src="/tex/6e004220e771f29919914a3d71bbdf53.svg?invert_in_darkmode&sanitize=true" align=middle width=237.76756244999993pt height=22.831056599999986pt/>X_i<img src="/tex/5d17741ce0a48f976613e000b90c8641.svg?invert_in_darkmode&sanitize=true" align=middle width=287.66578665pt height=22.831056599999986pt/>H<img src="/tex/6c20aaec28d2560595efb6a807c59e3f.svg?invert_in_darkmode&sanitize=true" align=middle width=700.2745777499999pt height=118.35616319999997pt/>X_i<img src="/tex/fb5220a8732fd491ff94aee8ac7d0760.svg?invert_in_darkmode&sanitize=true" align=middle width=154.80774375pt height=22.831056599999986pt/>L = \sum_{i=0}^N \left\lVert W_i H - X_i \right\rVert + \sum_{i=0}^N \left\lVert W_i H - (W_{i-2}T^2H + W_i T H) \right\rVert<img src="/tex/ef847a88a02d5b2ef1be42a3770000b7.svg?invert_in_darkmode&sanitize=true" align=middle width=181.50738704999998pt height=39.45205439999997pt/>T, W_0, and H<img src="/tex/ef3cb0c949bee696e9d880524395bf99.svg?invert_in_darkmode&sanitize=true" align=middle width=536.48538405pt height=157.8082209pt/>main.py<img src="/tex/1ff258c06ddf59749e2151328bb1abef.svg?invert_in_darkmode&sanitize=true" align=middle width=207.31503045pt height=22.831056599999986pt/>Model.fit<img src="/tex/8ecebfa9de5ea5e0ed6e13e145ce5f74.svg?invert_in_darkmode&sanitize=true" align=middle width=700.2745249499999pt height=203.6529759pt/>forward<img src="/tex/839b0d491281a465798505b53bd36086.svg?invert_in_darkmode&sanitize=true" align=middle width=877.05752475pt height=481.64383740000005pt/>crit$ stands for criterion, which here is the mean-squared-error (MSE) of all the trainable parameters. The training criterion goes way down, indicating that the optimizer is working well. There is a bit of generalization performance, as the test criterion does down about 15%, but better regularizers and more data can make this improve more. The interactive version of these plots are here https://www.comet.ml/wronnyhuang/nmf/e1e9bd13799448f3bf04365e5aec57c4.
+<img src="/tex/c8acc7bbe0a11c2d7191024d39d9a0a0.svg?invert_in_darkmode&sanitize=true" align=middle width=165.23023439999997pt height=26.76175259999998pt/>
+
+<img src="/tex/7b9a0316a2fcd7f01cfd556eedf72e96.svg?invert_in_darkmode&sanitize=true" align=middle width=14.99998994999999pt height=22.465723500000017pt/> is the feature basis, which is consistent over the entire sequence, and <img src="/tex/7185d0c367d394c42432a1246eceab81.svg?invert_in_darkmode&sanitize=true" align=middle width=20.176033349999987pt height=22.465723500000017pt/> is the condensed representation of <img src="/tex/1338d1e5163ba5bc872f1411dd30b36a.svg?invert_in_darkmode&sanitize=true" align=middle width=18.269651399999987pt height=22.465723500000017pt/> on the feature basis spanned by the rows of <img src="/tex/7b9a0316a2fcd7f01cfd556eedf72e96.svg?invert_in_darkmode&sanitize=true" align=middle width=14.99998994999999pt height=22.465723500000017pt/>
+
+**Loss**
+
+The loss function for optimization is the distance (e.g., frobenius norm) of the predicted values of <img src="/tex/1338d1e5163ba5bc872f1411dd30b36a.svg?invert_in_darkmode&sanitize=true" align=middle width=18.269651399999987pt height=22.465723500000017pt/> from their true values
+
+<img src="/tex/f493634d195779fc7a1d5b4b845a74c1.svg?invert_in_darkmode&sanitize=true" align=middle width=456.4371075pt height=32.256008400000006pt/>
+
+The trainable variables are <img src="/tex/4ab841e2c685781e6d9177d6b28b3ae7.svg?invert_in_darkmode&sanitize=true" align=middle width=90.59940945pt height=22.831056599999986pt/>, which we also l2-regularize to improve generalization.
+
+## Usage
+
+### Requirements
+- `tensorflow 1.9` (haven't tested on other versions)
+- `numpy`
+
+### Running the code
+
+The code is self contained within the <img src="/tex/24f3b5d61559402ec87940f65513fb36.svg?invert_in_darkmode&sanitize=true" align=middle width=60.13837334999999pt height=21.68300969999999pt/> file. Toy data is included in the <img src="/tex/43af940070a675cffcce616b979f3bd6.svg?invert_in_darkmode&sanitize=true" align=middle width=73.12917314999999pt height=22.831056599999986pt/> function. Change this to integrate your data.
+
+### Computation graph visualization
+An interactive tensorboard of the constructed computation graph is in the following link
+https://boards.aughie.org/board/IQg3vzIEAcHviNIniDicLLQ-U_E/
+
+Screenshot of high level graph
+
+![tensorboard high level](doc/tensorboard.png)
+
+The main feed-forward computations are enclosed within the <img src="/tex/6a5854152f3d92fa90cd1c442142c66a.svg?invert_in_darkmode&sanitize=true" align=middle width=62.98733759999998pt height=22.831056599999986pt/> block.
+
+![tensorboard zoom in](doc/tensorboardzoom.png)
+
+## Results on graph data 
+
+### Data exploration and normalization
+
+Typically graph features (such as those extracted by ReFeX) can contain large variations in the values. To make the optimization work, we must first normalize the graph features values. To do this, we mean-standardize each feature's marginal distribution. We show the data exploration and normalization process in this notebook https://colab.research.google.com/drive/13Gj8qYA2Nl8jucQbWaYeuclmaStkwODL
+
+A gif of all the nonzero feature marginal distributions is shown here. The data comes from features extraction from a graph of transactions at a financial institution.
+
+![histograms](doc/histograms.gif)
+
+
+### Results
+
+General (negative values allowed) matrix factorization yields the following training curve. <img src="/tex/75528dd9fe475ae921d58755998e8e40.svg?invert_in_darkmode&sanitize=true" align=middle width=26.58608369999999pt height=21.68300969999999pt/> stands for criterion, which here is the mean-squared-error (MSE) of all the trainable parameters. The training criterion goes way down, indicating that the optimizer is working well. There is a bit of generalization performance, as the test criterion does down about 15%, but better regularizers and more data can make this improve more. The interactive version of these plots are here https://www.comet.ml/wronnyhuang/nmf/e1e9bd13799448f3bf04365e5aec57c4.
 
 ![general matrix factorization training curve](doc/traincurve.png)
