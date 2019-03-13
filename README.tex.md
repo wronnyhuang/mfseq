@@ -33,6 +33,23 @@ $ \underset{W_i, H, T}{\mathrm{argmin}}\; \alpha\frac{1}{N}\sum_{i=1}^N \left\lV
 
 The first term is the *compression* loss, or how much data is lost going from the raw representation to the condensed representation. The second term is the *transition* loss, or how well the transition rule is able to predict the next step, given a compression scheme. The third and fourth terms are weight decay regularizers aimed at getting better generalization. They have a 1-norm in the axis corresponding to the features to enforce sparsity, and a 2-norm in the other axis. The final term is a nonnegativity enforcer, which has zero loss for positive values. The relative importances of each loss term are given by the coefficients $\alpha, \beta, \kappa, \eta$
 
+## Data exploration, scaling, and normalization
+
+Typically graph features (such as those extracted by ReFeX) can contain large variations in the values. To make the optimization work, we must first normalize the graph features values. To do this, we and mean normalize each feature's marginal distribution. Some feature distributions are also log-scaled. We show the data exploration and normalization process in this notebook https://colab.research.google.com/drive/13Gj8qYA2Nl8jucQbWaYeuclmaStkwODL
+
+A gif of all the nonzero feature marginal distributions is shown here. The data comes from features extraction from a graph of transactions at a financial institution.
+
+![histograms](doc/histograms.gif)
+
+### Inactive row feature
+We define a row to be inactive if it contains all zeros for a particular time step. We added an additional column which is 1 if the row is inactive for that time step, and 0 otherwise.
+If a particular node is inactive for all time steps. We define a row to be *dead* if it contains all zeros for all time steps. If a row is dead, we remove it from the data. 
+
+### Row-wise unit normalization
+We unit normalize each row in $X_i$ as follows
+
+$X_{i,\mathrm{row}\ j} \leftarrow \frac{X_{i,\mathrm{row}\ j}}{||\frac{X_{i,\mathrm{row}\ j}||}
+
 
 ## Usage
 
@@ -55,16 +72,6 @@ Screenshot of high level graph
 The main feed-forward computations are enclosed within the $forward$ block.
 
 ![tensorboard zoom in](doc/tensorboardzoom.png)
-
-## Results on graph data 
-
-### Data exploration and normalization
-
-Typically graph features (such as those extracted by ReFeX) can contain large variations in the values. To make the optimization work, we must first normalize the graph features values. To do this, we mean-standardize each feature's marginal distribution. We show the data exploration and normalization process in this notebook https://colab.research.google.com/drive/13Gj8qYA2Nl8jucQbWaYeuclmaStkwODL
-
-A gif of all the nonzero feature marginal distributions is shown here. The data comes from features extraction from a graph of transactions at a financial institution.
-
-![histograms](doc/histograms.gif)
 
 
 ### Results
