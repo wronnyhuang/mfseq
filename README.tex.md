@@ -42,7 +42,7 @@ The first term is the *compression* loss, or how much data is lost going from th
 
 ### Running the code
 
-The code is self contained within the $main.py$ file. Toy data is included in the $Model.fit$ function. Change this to integrate your data.
+The code is self contained within the `main.py` file. 
 
 ### Computation graph visualization
 An interactive tensorboard of the constructed computation graph is in the following link
