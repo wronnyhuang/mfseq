@@ -23,15 +23,16 @@ $H$ is the feature basis, which is consistent over the entire sequence, and $W_i
 
 **Loss**
 
-The loss function for optimization is the distance (e.g., frobenius norm) of the predicted values of $X_i$ from their true values
+The loss function for optimization is the distance (e.g., frobenius norm) of the predicted values of $X_i$ from their true values, as provided by the data. The trainable variables are $T, W_i, H$. The optimization objective is the long expression below.
 
-$\underset{W_i, H}{\mathrm{argmin}}\; \alpha\sum_{i=1}^N \left\lVert W_i H - X_i \right\rVert^2 + 
+$ \underset{W_i, H, T}{\mathrm{argmin}}\; \alpha\sum_{i=1}^N \left\lVert W_i H - X_i \right\rVert^2 + 
 (1-\alpha)\sum_{i=3}^N \left\lVert W_i H - (W_{i-2}T^2H + W_i T H) \right\rVert^2 + 
 \beta\sum_{i=1}^N \left\lVert W_i \right\rVert_{2,1}^2 + 
 \kappa\left\lVert H \right\rVert_{1,2}^2 + 
 \eta\sum_{\mathrm{all\ elements}}\left\lVert \mathrm{relu}([W, H]) \right\rVert^2 $
 
-The trainable variables are $T, W_0, and H$, which we also l2-regularize to improve generalization.
+The first term is the *compression* loss, or how much data is lost going from the raw representation to the condensed representation. The second term is the *transition* loss, or how well the transition rule is able to predict the next step, given a compression scheme. The third and fourth terms are weight decay regularizers aimed at getting better generalization. They have a 1-norm in the axis corresponding to the features to enforce sparsity, and a 2-norm in the other axis. The final term is a nonnegativity enforcer, which has zero loss for positive values. The relative importances of each loss term are given by the coefficients $\alpha, \beta, \kappa, \eta$
+
 
 ## Usage
 
