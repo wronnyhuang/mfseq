@@ -25,7 +25,7 @@ subject to a transition rule based on transition matrix <img src="/tex/2f118ee06
 
 The loss function for optimization is the distance (e.g., frobenius norm) of the predicted values of <img src="/tex/1338d1e5163ba5bc872f1411dd30b36a.svg?invert_in_darkmode&sanitize=true" align=middle width=18.269651399999987pt height=22.465723500000017pt/> from their true values
 
-<img src="/tex/f493634d195779fc7a1d5b4b845a74c1.svg?invert_in_darkmode&sanitize=true" align=middle width=456.4371075pt height=32.256008400000006pt/>
+<img src="/tex/9e052f77a7788751f952bb7a633c0405.svg?invert_in_darkmode&sanitize=true" align=middle width=700.2740415pt height=63.32413559999998pt/>
 
 The trainable variables are <img src="/tex/4ab841e2c685781e6d9177d6b28b3ae7.svg?invert_in_darkmode&sanitize=true" align=middle width=90.59940945pt height=22.831056599999986pt/>, which we also l2-regularize to improve generalization.
 
