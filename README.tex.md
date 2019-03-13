@@ -48,7 +48,7 @@ If a particular node is inactive for all time steps. We define a row to be *dead
 ### Row-wise unit normalization
 We unit normalize each row in $X_i$ as follows
 
-$X_{i,\mathrm{row}\ j} \leftarrow \frac{X_{i,\mathrm{row}\ j}}{||\frac{X_{i,\mathrm{row}\ j}||}
+$X_{i,\mathrm{row}\ j} \leftarrow \frac{X_{i,\mathrm{row}\ j}}{||\frac{X_{i,\mathrm{row}\ j}||}$
 
 
 ## Usage
