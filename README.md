@@ -23,11 +23,12 @@ subject to a transition rule based on transition matrix <img src="/tex/2f118ee06
 
 **Loss**
 
-The loss function for optimization is the distance (e.g., frobenius norm) of the predicted values of <img src="/tex/1338d1e5163ba5bc872f1411dd30b36a.svg?invert_in_darkmode&sanitize=true" align=middle width=18.269651399999987pt height=22.465723500000017pt/> from their true values
+The loss function for optimization is the distance (e.g., frobenius norm) of the predicted values of <img src="/tex/1338d1e5163ba5bc872f1411dd30b36a.svg?invert_in_darkmode&sanitize=true" align=middle width=18.269651399999987pt height=22.465723500000017pt/> from their true values, as provided by the data. The trainable variables are <img src="/tex/296143ea793eb8432d75e9086a93abdf.svg?invert_in_darkmode&sanitize=true" align=middle width=61.58575334999999pt height=22.465723500000017pt/>. The optimization objective is the long expression below.
 
-<img src="/tex/a89c2ce1627f6122d1aa5c80f6a12866.svg?invert_in_darkmode&sanitize=true" align=middle width=714.8660606999999pt height=84.34700339999996pt/>
+<img src="/tex/7a7dc2c2858348778e6dbc1802d02634.svg?invert_in_darkmode&sanitize=true" align=middle width=714.8660606999999pt height=84.34700339999996pt/>
 
-The trainable variables are <img src="/tex/4ab841e2c685781e6d9177d6b28b3ae7.svg?invert_in_darkmode&sanitize=true" align=middle width=90.59940945pt height=22.831056599999986pt/>, which we also l2-regularize to improve generalization.
+The first term is the *compression* loss, or how much data is lost going from the raw representation to the condensed representation. The second term is the *transition* loss, or how well the transition rule is able to predict the next step, given a compression scheme. The third and fourth terms are weight decay regularizers aimed at getting better generalization. They have a 1-norm in the axis corresponding to the features to enforce sparsity, and a 2-norm in the other axis. The final term is a nonnegativity enforcer, which has zero loss for positive values. The relative importances of each loss term are given by the coefficients <img src="/tex/ae28f809cb0fe8223df4e211f9991f1b.svg?invert_in_darkmode&sanitize=true" align=middle width=60.88275104999999pt height=22.831056599999986pt/>
+
 
 ## Usage
 
