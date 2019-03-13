@@ -15,29 +15,26 @@ each with a decomposition of
 
 $X_i = W_i H$
 
-subject to the transition matrix $T$
+subject to a transition rule based on transition matrix $T$
 
-$W_{i+1} = W_i T$
+$W_i = W_{i-1}T + w_{i-2}T^2
 
-$H$ is the feature basis, which is consistent over the entire sequence, and $W_i$ is the condensed representation of $X_i$ on the feature basis spanned by $H$
+$H$ is the feature basis, which is consistent over the entire sequence, and $W_i$ is the condensed representation of $X_i$ on the feature basis spanned by the rows of $H$
 
-We make the optimization easier by calculating only the residual of each transition
-
-$W_{i+1} = W_i + W_i T_res$
-
-_Loss_
+**Loss**
 
 The loss function for optimization is the distance (e.g., frobenius norm) of the predicted values of $X_i$ from their true values
 
-$L = \sum_i^N \mathrm{distance}( X_i, T^{i-1} W_0 H )$
+$\newcommand{\norm}[1]{\left\lVert#1\right\rVert}$
+$L = \sum_i^N \norm{x}$
 
 The trainable variables are $T, W_0, and H$, which we also l2-regularize to improve generalization.
 
 ## Usage
 
 ### Requirements
-- $tensorflow 1.9$ (haven't tested on other versions)
-- $numpy$
+- `tensorflow 1.9` (haven't tested on other versions)
+- `numpy`
 
 ### Running the code
 
