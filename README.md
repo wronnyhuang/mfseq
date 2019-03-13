@@ -17,7 +17,7 @@ each with a decomposition of
 
 subject to a transition rule based on transition matrix <img src="/tex/2f118ee06d05f3c2d98361d9c30e38ce.svg?invert_in_darkmode&sanitize=true" align=middle width=11.889314249999991pt height=22.465723500000017pt/>
 
-<img src="/tex/c8acc7bbe0a11c2d7191024d39d9a0a0.svg?invert_in_darkmode&sanitize=true" align=middle width=165.23023439999997pt height=26.76175259999998pt/>
+<img src="/tex/f2e64fc75c3319c2122027d1ec872de9.svg?invert_in_darkmode&sanitize=true" align=middle width=168.98686034999997pt height=26.76175259999998pt/>
 
 <img src="/tex/7b9a0316a2fcd7f01cfd556eedf72e96.svg?invert_in_darkmode&sanitize=true" align=middle width=14.99998994999999pt height=22.465723500000017pt/> is the feature basis, which is consistent over the entire sequence, and <img src="/tex/7185d0c367d394c42432a1246eceab81.svg?invert_in_darkmode&sanitize=true" align=middle width=20.176033349999987pt height=22.465723500000017pt/> is the condensed representation of <img src="/tex/1338d1e5163ba5bc872f1411dd30b36a.svg?invert_in_darkmode&sanitize=true" align=middle width=18.269651399999987pt height=22.465723500000017pt/> on the feature basis spanned by the rows of <img src="/tex/7b9a0316a2fcd7f01cfd556eedf72e96.svg?invert_in_darkmode&sanitize=true" align=middle width=14.99998994999999pt height=22.465723500000017pt/>
 
