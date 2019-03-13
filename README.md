@@ -9,27 +9,27 @@ Matrix factorization deals with the following problem.
 
 Here we deal with the problem where you have a sequence of data
 
-<img src="/tex/257607c8a2084cbcd56bd4af1d918051.svg?invert_in_darkmode&sanitize=true" align=middle width=99.34751804999999pt height=22.465723500000017pt/>
+<img src="/tex/da31113c64c6c6c46bacbba8c1dd46cd.svg?invert_in_darkmode&sanitize=true" align=middle width=110.30615474999999pt height=22.465723500000017pt/>
 
 each with a decomposition of
 
-<img src="/tex/a8505c0da8435483beafa5e5e28d4a5b.svg?invert_in_darkmode&sanitize=true" align=middle width=92.53206599999999pt height=22.465723500000017pt/>
+<img src="/tex/14efe141a5a9b56763e985b9c0958404.svg?invert_in_darkmode&sanitize=true" align=middle width=77.00709884999998pt height=22.465723500000017pt/>
 
 subject to the transition matrix <img src="/tex/2f118ee06d05f3c2d98361d9c30e38ce.svg?invert_in_darkmode&sanitize=true" align=middle width=11.889314249999991pt height=22.465723500000017pt/>
 
-<img src="/tex/66e779f879f103e83e2877c5fd8174a4.svg?invert_in_darkmode&sanitize=true" align=middle width=107.97168194999999pt height=22.465723500000017pt/>
+<img src="/tex/5b19806a66a36755c5875db66b9be40e.svg?invert_in_darkmode&sanitize=true" align=middle width=92.44671479999998pt height=22.465723500000017pt/>
 
 <img src="/tex/7b9a0316a2fcd7f01cfd556eedf72e96.svg?invert_in_darkmode&sanitize=true" align=middle width=14.99998994999999pt height=22.465723500000017pt/> is the feature basis, which is consistent over the entire sequence, and <img src="/tex/7185d0c367d394c42432a1246eceab81.svg?invert_in_darkmode&sanitize=true" align=middle width=20.176033349999987pt height=22.465723500000017pt/> is the condensed representation of <img src="/tex/1338d1e5163ba5bc872f1411dd30b36a.svg?invert_in_darkmode&sanitize=true" align=middle width=18.269651399999987pt height=22.465723500000017pt/> on the feature basis spanned by <img src="/tex/7b9a0316a2fcd7f01cfd556eedf72e96.svg?invert_in_darkmode&sanitize=true" align=middle width=14.99998994999999pt height=22.465723500000017pt/>
 
 We make the optimization easier by calculating only the residual of each transition
 
-<img src="/tex/0cfc064e4ec5ca0c19f64675af7b30f1.svg?invert_in_darkmode&sanitize=true" align=middle width=169.4166144pt height=22.465723500000017pt/>
+<img src="/tex/9d9ac08ddc6b0a915debc586e5f7afb5.svg?invert_in_darkmode&sanitize=true" align=middle width=153.89164724999998pt height=22.465723500000017pt/>
 
 _Loss_
 
 The loss function for optimization is the distance (e.g., frobenius norm) of the predicted values of <img src="/tex/1338d1e5163ba5bc872f1411dd30b36a.svg?invert_in_darkmode&sanitize=true" align=middle width=18.269651399999987pt height=22.465723500000017pt/> from their true values
 
-<img src="/tex/4cbfc855b154e568b3437911ab4a245e.svg?invert_in_darkmode&sanitize=true" align=middle width=293.19592005pt height=32.256008400000006pt/>
+<img src="/tex/217f98692670cc86f293ee6338fc0249.svg?invert_in_darkmode&sanitize=true" align=middle width=235.4742291pt height=32.256008400000006pt/>
 
 The trainable variables are <img src="/tex/4ab841e2c685781e6d9177d6b28b3ae7.svg?invert_in_darkmode&sanitize=true" align=middle width=90.59940945pt height=22.831056599999986pt/>, which we also l2-regularize to improve generalization.
 
