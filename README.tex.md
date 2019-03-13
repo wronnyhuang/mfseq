@@ -9,27 +9,27 @@ $X = WH$
 
 Here we deal with the problem where you have a sequence of data
 
-$X_1, X_2, ..., X_n$
+$X_1, X_2, \cdots, X_n$
 
 each with a decomposition of
 
-$X_i = W_i * H$
+$X_i = W_i H$
 
 subject to the transition matrix $T$
 
-$W_{i+1} = W_i * T$
+$W_{i+1} = W_i T$
 
 $H$ is the feature basis, which is consistent over the entire sequence, and $W_i$ is the condensed representation of $X_i$ on the feature basis spanned by $H$
 
 We make the optimization easier by calculating only the residual of each transition
 
-$W_{i+1} = W_i + W_i * T_res$
+$W_{i+1} = W_i + W_i T_res$
 
 _Loss_
 
 The loss function for optimization is the distance (e.g., frobenius norm) of the predicted values of $X_i$ from their true values
 
-$L = \sum_i^N distance( X_i, T^(i-1) * W_0 * H )$
+$L = \sum_i^N \mathrm{distance}( X_i, T^{i-1} W_0 H )$
 
 The trainable variables are $T, W_0, and H$, which we also l2-regularize to improve generalization.
 
