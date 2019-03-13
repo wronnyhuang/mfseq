@@ -38,7 +38,7 @@ The first term is the *compression* loss, or how much data is lost going from th
 
 ### Running the code
 
-The code is self contained within the <img src="/tex/24f3b5d61559402ec87940f65513fb36.svg?invert_in_darkmode&sanitize=true" align=middle width=60.13837334999999pt height=21.68300969999999pt/> file. Toy data is included in the <img src="/tex/43af940070a675cffcce616b979f3bd6.svg?invert_in_darkmode&sanitize=true" align=middle width=73.12917314999999pt height=22.831056599999986pt/> function. Change this to integrate your data.
+The code is self contained within the `main.py` file. 
 
 ### Computation graph visualization
 An interactive tensorboard of the constructed computation graph is in the following link
