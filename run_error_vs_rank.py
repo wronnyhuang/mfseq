@@ -7,9 +7,9 @@ def run(rank, gpu):
   print(command)
   output = subprocess.run(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, encoding='utf-8')
 
-nproc = 6
+nproc = 2
 processes = []
-for rank in range(3, 150):
+for rank in range(1, 400):
 
   i = 0
   while True:  # cycle iterate through the length of the list (nproc)
@@ -19,7 +19,7 @@ for rank in range(3, 150):
 
     # if list hasn't been built up yet (first nproc iterations)
     if len(processes) < nproc:
-      gpu = np.mod(len(processes),3)
+      gpu = np.mod(len(processes),2)
       process = Process(target=run, args=[rank, gpu])
       process.start()
       processes = processes + [process]

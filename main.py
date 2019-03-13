@@ -11,7 +11,7 @@ import torch.utils.data
 from time import time
 from utils import maybe_download, timenow
 from functools import reduce
-from matplotlib.pyplot import plot, imshow, colorbar, show, axis, hist, subplot, xlabel, ylabel, title, legend, savefig, figure, close, suptitle, tight_layout, xlim, ylim
+from matplotlib.pyplot import plot, imshow, colorbar, show, axis, hist, subplot, xlabel, ylabel, title, legend, savefig, figure, close, suptitle, tight_layout, xlim, ylim, clim
 import matplotlib.pyplot as plt
 
 # parse terminal arguments
@@ -22,113 +22,146 @@ parser.add_argument('-rank', default=10, type=int)
 parser.add_argument('-batchsize', default=20000, type=int)
 parser.add_argument('-lrnrate', default=.1, type=float)
 parser.add_argument('-lrdrop', default=70, type=int)
-parser.add_argument('-trancoef', default=.1, type=float)
-parser.add_argument('-wdeccoef', default=5e-3, type=float)
-parser.add_argument('-nnegcoef', default=1e-1, type=float)
-parser.add_argument('-maxgradnorm', default=10, type=float)
-parser.add_argument('-nepoc', default=100, type=int)
+parser.add_argument('-trancoef', default=.3, type=float)
+parser.add_argument('-wdeccoef', default=1e-8, type=float)
+parser.add_argument('-hdeccoef', default=1e-4, type=float)
+parser.add_argument('-nnegcoef', default=1e8, type=float)
+parser.add_argument('-maxgradnorm', default=1e10, type=float)
+parser.add_argument('-nepoc', default=300, type=int)
 parser.add_argument('-logtrain', default=2, type=int)
 parser.add_argument('-logtest', default=5, type=int)
 parser.add_argument('-logimage', action='store_true')
 parser.add_argument('-randname', action='store_true')
 args = parser.parse_args()
 
+def p_inv(matrix):
+  '''Returns the Moore-Penrose pseudoinverse'''
+  s, u, v = tf.svd(matrix)
+  threshold = tf.reduce_max(s) * 1e-5
+  s_mask = tf.boolean_mask(s, s > threshold)
+  s_inv = tf.diag(tf.concat([1. / s_mask, tf.zeros([tf.size(s) - tf.size(s_mask)])], 0))
+  return tf.matmul(v, tf.matmul(s_inv, tf.transpose(u)))
+
+
 class Model():
 
-  def __init__(self, args):
+  def __init__(self, args, ntime, nnode, nfeat):
     '''constructor of the model. create computation graph and build the session'''
-
     self.args = args
-    self.build_graph()
+    self.build_graph(ntime, nnode, nfeat)
     self.build_sess()
 
 
-  def build_graph(self):
+  def build_graph(self, ntime, nnode, nfeat):
     '''build computational graph'''
 
+    # inputs passed via feed dict
     with tf.name_scope('inputs'):
-      self.lr = tf.placeholder(tf.float32, [], name='lr')
-      self.X_true = tf.placeholder(tf.float32, datacube.shape, name='X_true')
-      self.gategrad = tf.placeholder(tf.float32, datacube.shape, name='gategrad')
+      self.lr = tf.placeholder(tf.float32, name='lr')
+      self.X_true = tf.placeholder(tf.float32, [ntime-1, nnode, nfeat], name='X_true')
+      self.x_last = tf.placeholder(tf.float32, [nnode, nfeat], name='x_last')
 
+    # forward propagation from inputs to predictions
     with tf.name_scope('forward'):
-      self.H = tf.Variable(tf.random_gamma(shape=[args.rank, nfeat], alpha=1.0), name='H', trainable=False)
-      self.T = tf.Variable(tf.random_gamma(shape=[args.rank, args.rank], alpha=1.0), name='T', trainable=False)
+      self.H = tf.Variable(tf.random_gamma(shape=[args.rank, nfeat], alpha=1.0), name='H')
+      self.T = tf.Variable(tf.random_gamma(shape=[args.rank, args.rank], alpha=1.0), name='T')
       self.W = []
-      X_pred = []
-      X_tran = []
+      X_comp = [] # X computed from compressed representation
+      X_tran = [] # X computed from transition matrix applied to previous compressed representations
 
-      for t in range(ntime):
+      # loop through time steps
+      for t in range(ntime-1):
         w = tf.Variable(tf.random_gamma(shape=[nnode, args.rank], alpha=1.0), name='W_'+str(t))
-        X_pred.append(tf.matmul(w, self.H, name='X_pred_'+str(t)))
         self.W.append(w)
-        if t >= 2: # add transition regularizer
-          x_tran = tf.add(tf.matmul(tf.matmul(self.W[-3], self.W[-3]), self.T), tf.matmul(self.W[-2], self.T), name='X_tran_'+str(t))
+        X_comp.append(tf.matmul(w, self.H, name='X_comp_'+str(t)))
+        if t >= 1: # X_tran is the result of a transition
+          x_tran = tf.matmul( tf.matmul(self.W[-2], tf.matmul(self.T, self.T)) + tf.matmul(self.W[-1], self.T), self.H, name='X_tran_'+str(t+1))
           X_tran.append(x_tran)
-      X_pred = tf.stack(X_pred, axis=0, name='X_pred')
 
+    # define loss criterion here (squared error, KL divergence, etc)
     criterion = tf.losses.mean_squared_error
 
+    # regularization terms
     with tf.name_scope('regularizers'):
+      with tf.name_scope('weightdecay'):
+        self.wdec = tf.reduce_sum(tf.add_n([tf.norm(w, ord=1, axis=1)**2 for w in self.W]))
+        self.hdec = tf.reduce_sum(tf.norm(self.H, ord=1, axis=0)**2)
+      with tf.name_scope('nonnegativity'):
+        self.nneg = tf.reduce_sum(tf.add_n([tf.nn.relu(-w)**2 for w in self.W])) + tf.reduce_sum(tf.nn.relu(-self.H)**2)
+        self.nneg = self.nneg / ( (ntime-1)*nnode*args.rank + args.rank*nfeat )
+
+    # loss terms
+    with tf.name_scope('losses'):
+      with tf.name_scope('compression'):
+        self.comp = criterion(X_comp, self.X_true)
       with tf.name_scope('transition'):
-        self.tran = tf.add_n([criterion(x_true, x_pred) for x_true, x_pred in zip(self.X_true[2:], self.X_tran]) / len(self.X_tran)
-      with tf.name_scope('weight_decay'):
-        self.wdec = tf.global_norm(tf.trainable_variables())
-      with tf.name_scope('nonneg'):
-        self.nneg = tf.global_norm([tf.nn.relu(-t) for t in tf.trainable_variables()])**2
+        self.tran = criterion(X_comp[2:], X_tran[:-1])
 
-    with tf.name_scope('loss'):
-      self.crit = criterion(X_pred, self.X_true)
-      self.loss = tf.add_n([(1-args.trancoef) * self.crit, args.trancoef * self.tran, args.wdeccoef * self.wdec, args.nnegcoef * self.nneg], name='loss')
+    # optimization objective
+    self.cost = tf.add_n([(1 - args.trancoef) * self.comp,
+                          args.trancoef * self.tran,
+                          args.hdeccoef * self.hdec,
+                          args.wdeccoef * self.wdec,
+                          args.nnegcoef * self.nneg], name='cost')
 
+    # training operations
     with tf.name_scope('train_ops'):
-      # keep track of training step
       self.step = tf.train.get_or_create_global_step()
-      # clip gradients by a max norm value
       opt = tf.train.AdamOptimizer(self.lr)
-      grads = tf.gradients(self.loss, tf.trainable_variables())
+      grads = tf.gradients(self.cost, tf.trainable_variables())
       grads, self.gradnorm = tf.clip_by_global_norm(grads, args.maxgradnorm)
-      # training op
       self.trainop = opt.apply_gradients(zip(grads, tf.trainable_variables()), global_step=self.step, name='trainop')
 
-    # # tensorboard summaries
-    # tf.summary.scalar('train/crit', self.crit)
-    # tf.summary.scalar('train/loss', self.loss)
-    # tf.summary.scalar('lr', self.lr)
-    # self.merged = tf.summary.merge_all()
+    # test operations
+    with tf.name_scope('test_ops'):
+      with tf.name_scope('compression_test'):
+        H_inv = p_inv(self.H)
+        self.w_last = tf.matmul(self.x_last, H_inv)
+        x_comp = tf.matmul(self.w_last, self.H)
+        self.comptest = criterion(x_comp, self.x_last)
+        self.comptestfrob = tf.norm((x_comp-self.x_last)**2)
+      with tf.name_scope('transition_test'):
+        self.trantest = criterion(X_tran[-1], x_comp)
+        self.trantestfrob = tf.norm((x_comp-X_tran[-1])**2)
 
 
   def build_sess(self):
     '''start tf session'''
-
     self.sess = tf.Session(config=tf.ConfigProto(allow_soft_placement=True, gpu_options=tf.GPUOptions(allow_growth=True)))
     self.sess.run(tf.global_variables_initializer())
     self.writer = tf.summary.FileWriter(self.args.logdir, graph=self.sess.graph)
 
 
-  def test(self, step):
+  def test(self, x_last, step):
     '''test on entire test set'''
-    crit = self.sess.run(self.crit, {self.X_true: datacube})
-    experiment.log_metric('test/crit', crit, step)
-    print('TEST:\tstep', step, '\tcrit', crit)
+    metricnodes = dict(comp=self.comptest, tran=self.trantest, compfrob=self.comptestfrob, tranfrob=self.trantestfrob)
+    metrics, self.w_last_save = self.sess.run([metricnodes, self.w_last], {self.x_last: x_last})
+    experiment.log_metrics(metrics, prefix='test', step=step)
+    print('TEST:\tstep', step, '\tcomp', metrics['comp'], '\ttran', metrics['tran'])
 
 
-  def fit(self):
+  def fit(self, datacube):
     '''fit the model to the data presented in the input dataloader'''
+
+    # split the data into train and test
+    X_true = datacube[:-1, :, :]
+    x_last = datacube[-1, :, :]
+    print('TRAIN: training on %s time steps of data, nnode=%s nfeat=%s rank=%s' % (len(X_true), nnode, nfeat, args.rank))
+
+    # start looping through epochs
     step = 0
-    self.metrics = dict(loss=self.loss, crit=self.crit, tran=self.tran, wdec=self.wdec, nneg=self.nneg, gradnorm=self.gradnorm)
+    metricnodes = dict(cost=self.cost, comp=self.comp, tran=self.tran, wdec=self.wdec, hdec=self.hdec, nneg=self.nneg, gradnorm=self.gradnorm)
     for epoch in range(args.nepoc):
       dropfactor = 0.1 if step > args.lrdrop else 1
-      _, metrics, step, = self.sess.run([self.trainop, self.metrics, self.step],
-                                        {self.X_true: datacube,
-                                         self.lr: args.lrnrate * dropfactor,
-                                         self.gategrad: gate,
+      _, metrics, step, = self.sess.run([self.trainop, metricnodes, self.step],
+                                        {self.lr: args.lrnrate * dropfactor,
+                                         self.X_true: X_true,
                                         })
       if np.mod(step, args.logtrain)==0:
         experiment.log_metrics(metrics, step=step)
-        print('TRAIN:\tepoch', epoch, '\tstep', step, '\tcrit', metrics['crit'], '\tloss', metrics['loss'])
+        print('TRAIN:\tepoch', epoch, '\tstep', step, '\tcomp', metrics['comp'], '\ttran', metrics['tran'], '\tcost', metrics['cost'])
       if np.mod(step, args.logtest)==0:
-        self.test(step)
+        self.test(x_last, step)
         if args.logimage: self.plot()
     print('done training')
 
@@ -140,7 +173,7 @@ class Model():
   def plot(self, ending=False):
     '''plot and save distributions'''
     params = self.get_params()
-    T, H, W = params['T'], params['H'], params['W']
+    W, H, T = self.sess.run([self.W, self.H, self.T])
     for i, w in enumerate(W):
       figname = 'distribution-W_'+str(i)
       hist(w.ravel(), 200); xlim(-.1, 2); title(figname)
@@ -157,12 +190,44 @@ class Model():
 
     if ending:
 
-      # plot distribution of labels
-      hist(datacube.ravel()[np.abs(datacube.ravel())>1e-2].ravel(), 200); xlim(-.1, 2); title('distribution-labels')
-      experiment.log_figure(figure=plt.gcf())
+      # plot distribution of values excluding zeros
+      hist(datacube.ravel()[np.abs(datacube.ravel())>1e-2].ravel(), 200); xlim(-.1, 2); title('distribution-values')
+      experiment.log_figure(figure_name='distribution-values', figure=plt.gcf())
+      close('all')
+
+      # plot distribution of values including zeros
+      hist(datacube.ravel(), 200); xlim(-.1, 2); title('distribution-values-withzeros')
+      experiment.log_figure(figure_name='distribution-values', figure=plt.gcf())
+      close('all')
+
+      # plot H matrix heatmap
+      figure(figsize=(24,10))
+      imshow(H); axis('image'); colorbar(); clim(0, 1)
+      experiment.log_figure(figure_name='H-matrix')
+      close('all')
+
+      # plot T matrix heatmap
+      figure(figsize=(10,10))
+      imshow(T); axis('image'); colorbar();
+      experiment.log_figure(figure_name='T-matrix')
+      close('all')
+
+      # plot W matrix heatmap
+      for t, w in enumerate(W):
+        figure(figsize=(10,10))
+        imshow(w[:args.rank,:]); axis('image'); colorbar(); clim(0, 1)
+        experiment.log_figure(figure_name='W_%s-matrix'%(t))
+        close('all')
+
+      # plot w_last heatmap
+      figure(figsize=(10,10))
+      imshow(self.w_last_save[:args.rank,:]); axis('image'); colorbar(); clim(0, 1)
+      experiment.log_figure(figure_name='w_last-matrix')
+      close('all')
+
 
       # dump W, H, T to disk
-      with open(join(args.logdir, 'learned_params.joblib'), 'wb') as f:
+      with gzip.open(join(args.logdir, 'learned_params.joblib'), 'wb') as f:
         joblib.dump(params, f)
         experiment.log_asset(join(args.logdir, 'learned_params.joblib'))
 
@@ -170,7 +235,7 @@ class Model():
 if __name__=='__main__':
 
   # comet experiement
-  experiment = Experiment(api_key="vPCPPZrcrUBitgoQkvzxdsh9k", parse_args=False, project_name='nmf-ranksweep')
+  experiment = Experiment(api_key="vPCPPZrcrUBitgoQkvzxdsh9k", parse_args=False, project_name='ranksweep-1')
   experiment.log_parameters(vars(args))
 
   # front matter
@@ -187,18 +252,13 @@ if __name__=='__main__':
                  'graph_data_cube.pkl', join(home, 'datasets'), filetype='file')
   with gzip.open(join(home, 'datasets', 'graph_data_cube.pkl'), 'rb') as f:
     datacube = pickle.load(f)
-
   ntime, nnode, nfeat = datacube.shape
-  gate = np.ones([ntime, nnode, args.rank]) # gate is multiplied against gradients wrt W
-  nodeidx = np.random.permutation(nnode)
-  split = int(.9*len(nodeidx))
-  gate[:, nodeidx[split:], :] = 0
 
   # build tf graph
-  model = Model(args)
+  model = Model(args, ntime, nnode, nfeat)
 
   # run optimizer on training data
-  model.fit()
+  model.fit(datacube)
 
-  # plot stuff
+  # plot visualizations
   model.plot(ending=True)
