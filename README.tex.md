@@ -17,7 +17,7 @@ $X_i = W_i H$
 
 subject to a transition rule based on transition matrix $T$
 
-$W_i = W_{i-1}T + w_{i-2}T^2
+$W_i = W_{i-1}T + w_{i-2}T^2$
 
 $H$ is the feature basis, which is consistent over the entire sequence, and $W_i$ is the condensed representation of $X_i$ on the feature basis spanned by the rows of $H$
 
