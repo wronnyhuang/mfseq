@@ -17,7 +17,6 @@ import matplotlib.pyplot as plt
 # parse terminal arguments
 parser = argparse.ArgumentParser()
 parser.add_argument('-gpu', default='0', type=str)
-parser.add_argument('-name', default='debug', type=str)
 parser.add_argument('-rank', default=10, type=int)
 parser.add_argument('-batchsize', default=20000, type=int)
 parser.add_argument('-lrnrate', default=.1, type=float)
@@ -31,7 +30,7 @@ parser.add_argument('-nepoc', default=300, type=int)
 parser.add_argument('-logtrain', default=2, type=int)
 parser.add_argument('-logtest', default=5, type=int)
 parser.add_argument('-logimage', action='store_true')
-parser.add_argument('-randname', action='store_true')
+parser.add_argument('-dumpdisk', action='store_true')
 args = parser.parse_args()
 
 def p_inv(matrix):
@@ -227,9 +226,10 @@ class Model():
 
 
       # dump W, H, T to disk
-      with gzip.open(join(args.logdir, 'learned_params.joblib'), 'wb') as f:
-        joblib.dump(params, f)
-        experiment.log_asset(join(args.logdir, 'learned_params.joblib'))
+      if args.dumpdisk:
+        with gzip.open(join(args.logdir, 'learned_params.joblib'), 'wb') as f:
+          joblib.dump(params, f)
+          experiment.log_asset(join(args.logdir, 'learned_params.joblib'))
 
 
 if __name__=='__main__':
@@ -240,10 +240,9 @@ if __name__=='__main__':
 
   # front matter
   home = os.environ['HOME']
-  autoname = 'rank_%s/lr_%s/wdeccoef_%s' % (args.rank, args.lrnrate, args.wdeccoef)
+  autoname = 'rank_%s/lr_%s' % (args.rank, args.lrnrate)
   experiment.set_name(autoname)
-  args.name = autoname
-  args.logdir = join(home, 'ckpt', args.name)
+  args.logdir = join(home, 'ckpt', autoname)
   os.makedirs(args.logdir, exist_ok=True)
   os.environ['CUDA_VISIBLE_DEVICES'] = args.gpu
 

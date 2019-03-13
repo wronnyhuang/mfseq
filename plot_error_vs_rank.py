@@ -21,5 +21,5 @@ for experiment in experiments:
 plot(ranks, errors, '.', markersize=8)
 title('rank vs error')
 xlabel('rank')
-ylabel('error (frobenius norm)')
+ylabel('transition error (frob norm)')
 show()
