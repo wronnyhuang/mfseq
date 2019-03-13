@@ -5,7 +5,7 @@ Matrix factorization is used in recommender systems, topic modeling, data compre
 ## Formulation
 Matrix factorization deals with the following problem.
 
-`X = W * H`
+<img src="/tex/73004fd968e764427157961ca754b7e1.svg?invert_in_darkmode&sanitize=true" align=middle width=85.15951289999998pt height=22.465723500000017pt/>
 
 Here we deal with the problem where you have a sequence of data
 
