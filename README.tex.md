@@ -21,7 +21,7 @@ $W_i = W_{i-1}T + w_{i-2}T^2$
 
 $H$ is the feature basis, which is consistent over the entire sequence, and $W_i$ is the condensed representation of $X_i$ on the feature basis spanned by the rows of $H$
 
-**Loss**
+## Loss Function
 
 The loss function for optimization is the distance (e.g., frobenius norm) of the predicted values of $X_i$ from their true values, as provided by the data. The trainable variables are $T, W_i, H$. The optimization objective is the long expression below.
 
