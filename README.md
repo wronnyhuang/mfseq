@@ -21,7 +21,7 @@ subject to a transition rule based on transition matrix <img src="/tex/2f118ee06
 
 <img src="/tex/7b9a0316a2fcd7f01cfd556eedf72e96.svg?invert_in_darkmode&sanitize=true" align=middle width=14.99998994999999pt height=22.465723500000017pt/> is the feature basis, which is consistent over the entire sequence, and <img src="/tex/7185d0c367d394c42432a1246eceab81.svg?invert_in_darkmode&sanitize=true" align=middle width=20.176033349999987pt height=22.465723500000017pt/> is the condensed representation of <img src="/tex/1338d1e5163ba5bc872f1411dd30b36a.svg?invert_in_darkmode&sanitize=true" align=middle width=18.269651399999987pt height=22.465723500000017pt/> on the feature basis spanned by the rows of <img src="/tex/7b9a0316a2fcd7f01cfd556eedf72e96.svg?invert_in_darkmode&sanitize=true" align=middle width=14.99998994999999pt height=22.465723500000017pt/>
 
-**Loss**
+## Loss Function
 
 The loss function for optimization is the distance (e.g., frobenius norm) of the predicted values of <img src="/tex/1338d1e5163ba5bc872f1411dd30b36a.svg?invert_in_darkmode&sanitize=true" align=middle width=18.269651399999987pt height=22.465723500000017pt/> from their true values, as provided by the data. The trainable variables are <img src="/tex/296143ea793eb8432d75e9086a93abdf.svg?invert_in_darkmode&sanitize=true" align=middle width=61.58575334999999pt height=22.465723500000017pt/>. The optimization objective is the long expression below.
 
