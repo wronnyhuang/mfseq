@@ -25,11 +25,11 @@ $H$ is the feature basis, which is consistent over the entire sequence, and $W_i
 
 The loss function for optimization is the distance (e.g., frobenius norm) of the predicted values of $X_i$ from their true values
 
-$\underset{\theta}{\mathrm{argmin}}\; \alpha\sum_{i=1}^N \left\lVert W_i H - X_i \right\rVert^2 + 
+$\underset{W_i, H}{\mathrm{argmin}}\; \alpha\sum_{i=1}^N \left\lVert W_i H - X_i \right\rVert^2 + 
 (1-\alpha)\sum_{i=3}^N \left\lVert W_i H - (W_{i-2}T^2H + W_i T H) \right\rVert^2 + 
 \beta\sum_{i=1}^N \left\lVert W_i \right\rVert_{2,1}^2 + 
 \kappa\left\lVert H \right\rVert_{1,2}^2 + 
-\eta\left\lVert \mathrm{relu(all W and H elements)} \right\rVert^2 $
+\eta\left\lVert \mathrm{relu}(W_i,H\mathrm{elements}) \right\rVert^2 $
 
 The trainable variables are $T, W_0, and H$, which we also l2-regularize to improve generalization.
 
