@@ -42,8 +42,8 @@ A gif of all the nonzero feature marginal distributions is shown here. The data 
 ![histograms](doc/histograms.gif)
 
 ### Inactive row feature
-We define a row to be inactive if it contains all zeros for a particular time step. We added an additional column which is 1 if the row is inactive for that time step, and 0 otherwise.
-If a particular node is inactive for all time steps. We define a row to be *dead* if it contains all zeros for all time steps. If a row is dead, we remove it from the data. 
+We define a row to be *inactive* if it contains all zeros for a particular time step. We added an additional column which is 1 if the row is inactive for that time step, and 0 otherwise.
+If a particular node is inactive for all time steps. We define a row to be *dead* if it is inactive for all time steps. If a row is dead, we remove it from the data. 
 
 ### Row-wise unit normalization
 We unit normalize each row in $X_i$ as follows

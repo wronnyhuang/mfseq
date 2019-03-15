@@ -183,7 +183,7 @@ class Model():
     experiment.log_figure(figure_name=figname, figure=plt.gcf())
     close('all')
     figname = 'distribution-T'
-    hist(T.ravel(), 10); xlim(-.1, 2); title(figname)
+    hist(T.ravel(), 10); title(figname)
     experiment.log_figure(figure_name=figname, figure=plt.gcf())
     close('all')
 
