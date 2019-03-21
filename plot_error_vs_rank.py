@@ -23,3 +23,4 @@ title('rank vs error')
 xlabel('rank')
 ylabel('transition error (frob norm)')
 show()
+
