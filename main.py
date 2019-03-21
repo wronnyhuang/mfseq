@@ -224,7 +224,6 @@ class Model():
       experiment.log_figure(figure_name='w_last-matrix')
       close('all')
 
-
       # dump W, H, T to disk
       if args.dumpdisk:
         with gzip.open(join(args.logdir, 'learned_params.joblib'), 'wb') as f:
