@@ -7,7 +7,8 @@ def run(rank, gpu):
   print(command)
   output = subprocess.run(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, encoding='utf-8')
 
-nproc = 2
+nproc = 8 # number of parallel processes to run at any given time. e.g. if 8, and you have 4 gpus, then 2 procs on each gpu
+ngpu = 4
 processes = []
 for rank in range(1, 400):
 
@@ -19,7 +20,7 @@ for rank in range(1, 400):
 
     # if list hasn't been built up yet (first nproc iterations)
     if len(processes) < nproc:
-      gpu = np.mod(len(processes),2)
+      gpu = np.mod(len(processes), ngpu)
       process = Process(target=run, args=[rank, gpu])
       process.start()
       processes = processes + [process]
