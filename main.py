@@ -234,7 +234,7 @@ class Model():
 if __name__=='__main__':
 
   # comet experiement
-  experiment = Experiment(api_key="vPCPPZrcrUBitgoQkvzxdsh9k", parse_args=False, project_name='ranksweep-1')
+  experiment = Experiment(api_key="vPCPPZrcrUBitgoQkvzxdsh9k", parse_args=False, project_name='mfseq_transition_matrix')
   experiment.log_parameters(vars(args))
 
   # front matter
